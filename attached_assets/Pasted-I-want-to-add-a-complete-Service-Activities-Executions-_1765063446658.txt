@@ -1,0 +1,243 @@
+I want to add a complete “Service Activities & Executions” module to the existing ContractFlow-Manager system, with full data model, API and UI, including file attachments as evidence of service execution.
+
+Please follow the existing architecture:
+
+Database with Drizzle ORM in shared/schema.ts
+
+Express backend in server/
+
+React + Vite + Tailwind + shadcn/ui in client/
+
+Use the existing storage/upload mechanism already used for documents.
+
+1) DATABASE – NEW TABLES
+
+Add the following tables to shared/schema.ts:
+
+service_activities
+Fields:
+
+id (serial, primary key)
+
+servicePostId (references service_posts.id)
+
+name (string, required)
+
+description (string, optional)
+
+ppuUnit (string, e.g. "hora", "ronda", "relatorio", "inspecao")
+
+frequency (enum: "daily", "weekly", "monthly", "on_demand")
+
+required (boolean)
+
+createdAt, updatedAt
+
+activity_executions
+Fields:
+
+id (serial, primary key)
+
+serviceActivityId (references service_activities.id)
+
+servicePostId (references service_posts.id)
+
+employeeId (references employees.id)
+
+date (date)
+
+quantity (number, default 1)
+
+notes (string, optional)
+
+createdAt, updatedAt
+
+activity_execution_attachments
+Fields:
+
+id (serial, primary key)
+
+activityExecutionId (references activity_executions.id)
+
+fileName
+
+filePath
+
+mimeType
+
+uploadedAt
+
+Use the same style and conventions already used in the existing schema file.
+
+Generate and apply the necessary migrations.
+
+2) BACKEND – ROUTES & CONTROLLERS
+
+Create new API routes under server/routes/activities.ts and register them in the main router:
+
+For service activities (configuration per post):
+
+GET /api/service-activities?servicePostId=
+→ list activities for a given service post
+
+POST /api/service-activities
+Body:
+
+servicePostId, name, description, ppuUnit, frequency, required
+
+PUT /api/service-activities/:id
+→ update activity
+
+DELETE /api/service-activities/:id
+→ soft delete or hard delete (be consistent with existing patterns)
+
+For activity executions (daily records):
+
+GET /api/activity-executions?servicePostId=&startDate=&endDate=
+→ list executions for a post in a period, including employee and activity info
+
+POST /api/activity-executions
+Body:
+
+serviceActivityId, servicePostId, employeeId, date, quantity, notes
+
+PUT /api/activity-executions/:id
+→ update execution
+
+DELETE /api/activity-executions/:id
+→ delete execution
+
+For attachments:
+
+Use the existing upload/storage mechanism already used by the documents module.
+Create:
+
+POST /api/activity-executions/:id/attachments
+→ upload one or more files as evidence (PDF, image, etc.)
+
+GET /api/activity-executions/:id/attachments
+→ list attachments
+
+GET /api/activity-execution-attachments/:attachmentId/download
+→ download a specific attachment
+
+Reuse the same multer/storage configuration and security checks used in the documents APIs.
+
+Ensure all routes are protected by the existing auth and role middlewares (admin/operator can create/edit, fiscal/viewer can only read and download).
+
+3) FRONTEND – SERVICE ACTIVITIES CONFIGURATION (PER POST)
+
+In the Service Post details page (client/src/pages/service-post-view.tsx or similar), add a new tab/section:
+
+“Atividades do Posto”
+
+This section must allow:
+
+Listing all activities for the current service post:
+
+Nome da atividade
+
+Unidade (PPU)
+
+Frequência
+
+Obrigatória (sim/não)
+
+Creating and editing activities:
+
+Use a shadcn Dialog or Drawer
+
+Fields: name, description, ppuUnit (select), frequency (select), required (checkbox)
+
+Save to /api/service-activities
+
+Deleting or disabling activities.
+
+The UI must follow the existing design system (shadcn + Tailwind, same spacing, typography and form components).
+
+4) FRONTEND – ACTIVITY EXECUTION PAGE
+
+Create a new page at client/src/pages/activity-executions.tsx and add it to the sidebar navigation as:
+
+“Execução de Atividades”
+
+Features:
+
+Filters at the top:
+
+Service Post (select)
+
+Date (or period)
+
+When a service post + date are selected:
+
+Show a table where each row is an activity for that post
+
+For each activity:
+
+show activity name, PPU unit, frequency, required (yes/no)
+
+allow selection of employee (from employees list for that unit/post)
+
+input for quantity
+
+textarea for notes
+
+button “Gerenciar Anexos” (to open attachments modal)
+
+When the user clicks “Salvar”:
+
+Create or update activity_executions records via /api/activity-executions
+
+Attachments:
+
+In the “Gerenciar Anexos” modal:
+
+list existing attachments for that execution
+
+button to upload new files
+
+button to download or remove existing attachments
+
+Use the same upload UI/UX pattern used for documents
+
+Only admins and operators can create/edit; fiscal and viewer roles can only view executions and download attachments.
+
+5) REPORTING HOOKS (PREPARATION)
+
+Add a helper backend function (no full UI needed yet, just the API):
+
+GET /api/reports/activity-execution?servicePostId=&startDate=&endDate=
+Returns for each activity:
+
+activity info
+
+total previsto (based on frequency and period)
+
+total realizado (sum of quantity)
+
+percentual de execução
+
+This will later be used to power a “Previsto × Executado por Atividade” report.
+
+6) GENERAL REQUIREMENTS
+
+Follow existing TypeScript and React patterns.
+
+Reuse existing auth/role guards.
+
+Make sure all forms have basic validation and feedback (success/error).
+
+Ensure that activities and executions appear in the audit trail and, when relevant, in LGPD logs, following the current patterns.
+
+At the end, please:
+
+List all files created or modified.
+
+Confirm that:
+
+I can configure activities per service post.
+
+I can register daily activity execution with employee, quantity, notes and attachments.
+
+I can view these records and attachments in a way that is usable for contract inspection.

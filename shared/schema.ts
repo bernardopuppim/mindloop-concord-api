@@ -43,6 +43,13 @@ export const feriasLicencasStatusEnum = pgEnum("ferias_licencas_status", [
   "concluido"
 ]);
 
+export const activityFrequencyEnum = pgEnum("activity_frequency", [
+  "daily",
+  "weekly",
+  "monthly",
+  "on_demand"
+]);
+
 // Session storage table - Required for Replit Auth
 export const sessions = pgTable(
   "sessions",
@@ -224,6 +231,42 @@ export const feriasLicencas = pgTable("ferias_licencas", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Service Activities table (configuration per post)
+export const serviceActivities = pgTable("service_activities", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  servicePostId: integer("service_post_id").notNull().references(() => servicePosts.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  ppuUnit: varchar("ppu_unit", { length: 100 }).notNull(),
+  frequency: activityFrequencyEnum("frequency").notNull(),
+  required: boolean("required").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Activity Executions table (daily records)
+export const activityExecutions = pgTable("activity_executions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  serviceActivityId: integer("service_activity_id").notNull().references(() => serviceActivities.id, { onDelete: "cascade" }),
+  servicePostId: integer("service_post_id").notNull().references(() => servicePosts.id, { onDelete: "cascade" }),
+  employeeId: integer("employee_id").references(() => employees.id, { onDelete: "set null" }),
+  date: date("date").notNull(),
+  quantity: integer("quantity").default(1).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Activity Execution Attachments table (evidence files)
+export const activityExecutionAttachments = pgTable("activity_execution_attachments", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  activityExecutionId: integer("activity_execution_id").notNull().references(() => activityExecutions.id, { onDelete: "cascade" }),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  filePath: varchar("file_path", { length: 500 }).notNull(),
+  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   documents: many(documents),
@@ -337,6 +380,37 @@ export const feriasLicencasRelations = relations(feriasLicencas, ({ one }) => ({
   }),
 }));
 
+export const serviceActivitiesRelations = relations(serviceActivities, ({ one, many }) => ({
+  servicePost: one(servicePosts, {
+    fields: [serviceActivities.servicePostId],
+    references: [servicePosts.id],
+  }),
+  executions: many(activityExecutions),
+}));
+
+export const activityExecutionsRelations = relations(activityExecutions, ({ one, many }) => ({
+  serviceActivity: one(serviceActivities, {
+    fields: [activityExecutions.serviceActivityId],
+    references: [serviceActivities.id],
+  }),
+  servicePost: one(servicePosts, {
+    fields: [activityExecutions.servicePostId],
+    references: [servicePosts.id],
+  }),
+  employee: one(employees, {
+    fields: [activityExecutions.employeeId],
+    references: [employees.id],
+  }),
+  attachments: many(activityExecutionAttachments),
+}));
+
+export const activityExecutionAttachmentsRelations = relations(activityExecutionAttachments, ({ one }) => ({
+  execution: one(activityExecutions, {
+    fields: [activityExecutionAttachments.activityExecutionId],
+    references: [activityExecutions.id],
+  }),
+}));
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -413,6 +487,23 @@ export const insertFeriasLicencasSchema = createInsertSchema(feriasLicencas).omi
   updatedAt: true,
 });
 
+export const insertServiceActivitySchema = createInsertSchema(serviceActivities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertActivityExecutionSchema = createInsertSchema(activityExecutions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertActivityExecutionAttachmentSchema = createInsertSchema(activityExecutionAttachments).omit({
+  id: true,
+  uploadedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -486,4 +577,29 @@ export type FeriasLicencas = typeof feriasLicencas.$inferSelect;
 export type FeriasLicencasWithRelations = FeriasLicencas & {
   employee?: Employee | null;
   createdByUser?: User | null;
+};
+
+export type InsertServiceActivity = z.infer<typeof insertServiceActivitySchema>;
+export type ServiceActivity = typeof serviceActivities.$inferSelect;
+
+export type InsertActivityExecution = z.infer<typeof insertActivityExecutionSchema>;
+export type ActivityExecution = typeof activityExecutions.$inferSelect;
+
+export type InsertActivityExecutionAttachment = z.infer<typeof insertActivityExecutionAttachmentSchema>;
+export type ActivityExecutionAttachment = typeof activityExecutionAttachments.$inferSelect;
+
+export type ServiceActivityWithRelations = ServiceActivity & {
+  servicePost?: ServicePost | null;
+  executions?: ActivityExecution[];
+};
+
+export type ActivityExecutionWithRelations = ActivityExecution & {
+  serviceActivity?: ServiceActivity | null;
+  servicePost?: ServicePost | null;
+  employee?: Employee | null;
+  attachments?: ActivityExecutionAttachment[];
+};
+
+export type ActivityExecutionAttachmentWithRelations = ActivityExecutionAttachment & {
+  execution?: ActivityExecution | null;
 };
