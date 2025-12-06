@@ -1,10 +1,13 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns";
-import { ChevronLeft, ChevronRight, Save } from "lucide-react";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, subMonths } from "date-fns";
+import { ChevronLeft, ChevronRight, Save, Upload, Copy, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
@@ -21,6 +24,9 @@ export default function AllocationPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedPost, setSelectedPost] = useState<string>("");
   const [editedAllocations, setEditedAllocations] = useState<Map<string, string>>(new Map());
+  const [csvDialogOpen, setCsvDialogOpen] = useState(false);
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: employees, isLoading: employeesLoading } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
@@ -36,6 +42,9 @@ export default function AllocationPage() {
 
   const startDateStr = format(monthStart, "yyyy-MM-dd");
   const endDateStr = format(monthEnd, "yyyy-MM-dd");
+  const currentMonthStr = format(currentDate, "yyyy-MM");
+  const previousMonthDate = subMonths(currentDate, 1);
+  const previousMonthStr = format(previousMonthDate, "yyyy-MM");
 
   const { data: allocations, isLoading: allocationsLoading } = useQuery<Allocation[]>({
     queryKey: ["/api/allocations", { startDate: startDateStr, endDate: endDateStr }],
@@ -57,6 +66,9 @@ export default function AllocationPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      if (!selectedPost) {
+        throw new Error("Please select a service post first");
+      }
       const updates = Array.from(editedAllocations.entries()).map(([key, status]) => {
         const [employeeId, date] = key.split("_");
         return {
@@ -80,6 +92,99 @@ export default function AllocationPage() {
       toast({ title: "Error", description: "Failed to save allocations", variant: "destructive" });
     },
   });
+
+  const copyMonthMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedPost) {
+        throw new Error("Please select a service post first");
+      }
+      const response = await apiRequest("POST", "/api/allocations/copy-month", {
+        sourceMonth: previousMonthStr,
+        targetMonth: currentMonthStr,
+        postId: selectedPost,
+      });
+      return response.json();
+    },
+    onSuccess: (data: { count: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/allocations"] });
+      toast({ 
+        title: "Success", 
+        description: `Copied ${data.count} allocations from previous month` 
+      });
+      setCopyDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to copy allocations", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const csvImportMutation = useMutation({
+    mutationFn: async (file: File) => {
+      if (!selectedPost) {
+        throw new Error("Please select a service post first");
+      }
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("postId", selectedPost);
+      formData.append("month", currentMonthStr);
+
+      const response = await fetch("/api/allocations/import-csv", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to import CSV");
+      }
+
+      return response.json();
+    },
+    onSuccess: (data: { imported: number; errors?: string[] }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/allocations"] });
+      let description = `Imported ${data.imported} allocations`;
+      if (data.errors && data.errors.length > 0) {
+        description += `. ${data.errors.length} rows had errors.`;
+      }
+      toast({ title: "Success", description });
+      setCsvDialogOpen(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to import CSV", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      csvImportMutation.mutate(file);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const csvContent = "employee_id,date,status\n1,2024-01-01,present\n2,2024-01-01,absent";
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "allocation_template.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const getAllocationStatus = (employeeId: number, date: Date): string | null => {
     const dateStr = format(date, "yyyy-MM-dd");
@@ -117,12 +222,114 @@ export default function AllocationPage() {
         title="Daily Allocation"
         description="Track employee attendance and allocations by service post"
       >
-        {isAdmin && editedAllocations.size > 0 && (
-          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} data-testid="button-save-allocations">
-            <Save className="h-4 w-4 mr-2" />
-            {saveMutation.isPending ? "Saving..." : `Save Changes (${editedAllocations.size})`}
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && selectedPost && (
+            <>
+              <Dialog open={csvDialogOpen} onOpenChange={setCsvDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" data-testid="button-import-csv">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Import CSV
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Import Allocations from CSV</DialogTitle>
+                    <DialogDescription>
+                      Upload a CSV file with columns: employee_id, date, status.
+                      Valid statuses: present, absent, justified, vacation, medical_leave.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="csv-file">CSV File</Label>
+                      <Input
+                        id="csv-file"
+                        type="file"
+                        accept=".csv"
+                        ref={fileInputRef}
+                        onChange={handleFileUpload}
+                        disabled={csvImportMutation.isPending}
+                        data-testid="input-csv-file"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={downloadTemplate}
+                      data-testid="button-download-template"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Template
+                    </Button>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCsvDialogOpen(false)}
+                      data-testid="button-cancel-csv"
+                    >
+                      Cancel
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" data-testid="button-copy-month">
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Previous Month
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Copy Previous Month's Allocations</DialogTitle>
+                    <DialogDescription>
+                      This will copy all allocations from {format(previousMonthDate, "MMMM yyyy")} to {format(currentDate, "MMMM yyyy")} for the selected service post.
+                      Existing allocations for the current month will be replaced.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4">
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="flex-1 p-3 rounded-md bg-muted">
+                        <div className="text-muted-foreground">From</div>
+                        <div className="font-medium">{format(previousMonthDate, "MMMM yyyy")}</div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                      <div className="flex-1 p-3 rounded-md bg-muted">
+                        <div className="text-muted-foreground">To</div>
+                        <div className="font-medium">{format(currentDate, "MMMM yyyy")}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCopyDialogOpen(false)}
+                      data-testid="button-cancel-copy"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => copyMonthMutation.mutate()}
+                      disabled={copyMonthMutation.isPending}
+                      data-testid="button-confirm-copy"
+                    >
+                      {copyMonthMutation.isPending ? "Copying..." : "Copy Allocations"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
+          {isAdmin && editedAllocations.size > 0 && (
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} data-testid="button-save-allocations">
+              <Save className="h-4 w-4 mr-2" />
+              {saveMutation.isPending ? "Saving..." : `Save Changes (${editedAllocations.size})`}
+            </Button>
+          )}
+        </div>
       </PageHeader>
 
       <Card>

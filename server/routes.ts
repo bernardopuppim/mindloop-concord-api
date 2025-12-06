@@ -319,6 +319,200 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/allocations/copy-month", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { sourceMonth, targetMonth, postId } = req.body;
+      
+      if (!sourceMonth || !targetMonth || !postId) {
+        return res.status(400).json({ message: "sourceMonth, targetMonth, and postId are required" });
+      }
+
+      const parsedPostId = parseInt(postId);
+      if (isNaN(parsedPostId) || parsedPostId <= 0) {
+        return res.status(400).json({ message: "Invalid postId" });
+      }
+
+      if (!/^\d{4}-\d{2}$/.test(sourceMonth) || !/^\d{4}-\d{2}$/.test(targetMonth)) {
+        return res.status(400).json({ message: "Invalid month format. Use YYYY-MM" });
+      }
+
+      if (sourceMonth === targetMonth) {
+        return res.status(400).json({ message: "Source and target months must be different" });
+      }
+
+      const sourceStart = `${sourceMonth}-01`;
+      const sourceYear = parseInt(sourceMonth.split("-")[0]);
+      const sourceMonthNum = parseInt(sourceMonth.split("-")[1]);
+      const sourceDaysInMonth = new Date(sourceYear, sourceMonthNum, 0).getDate();
+      const sourceEnd = `${sourceMonth}-${String(sourceDaysInMonth).padStart(2, "0")}`;
+
+      const targetYear = parseInt(targetMonth.split("-")[0]);
+      const targetMonthNum = parseInt(targetMonth.split("-")[1]);
+      const targetDaysInMonth = new Date(targetYear, targetMonthNum, 0).getDate();
+      const targetStart = `${targetMonth}-01`;
+      const targetEnd = `${targetMonth}-${String(targetDaysInMonth).padStart(2, "0")}`;
+
+      const sourceAllocations = await storage.getAllocationsByDateRangeAndPost(
+        sourceStart,
+        sourceEnd,
+        parsedPostId
+      );
+
+      if (sourceAllocations.length === 0) {
+        return res.status(400).json({ message: "No allocations found in source month" });
+      }
+
+      await storage.deleteAllocationsByDateRangeAndPost(targetStart, targetEnd, parsedPostId);
+
+      const newAllocations = sourceAllocations.map((allocation) => {
+        const sourceDate = new Date(allocation.date);
+        const dayOfMonth = sourceDate.getDate();
+        const adjustedDay = Math.min(dayOfMonth, targetDaysInMonth);
+        const targetDate = `${targetMonth}-${String(adjustedDay).padStart(2, "0")}`;
+
+        return {
+          employeeId: allocation.employeeId,
+          postId: parsedPostId,
+          date: targetDate,
+          status: allocation.status,
+          notes: allocation.notes,
+        };
+      });
+
+      const uniqueAllocations = newAllocations.reduce((acc, curr) => {
+        const key = `${curr.employeeId}-${curr.date}`;
+        if (!acc.has(key)) {
+          acc.set(key, curr);
+        }
+        return acc;
+      }, new Map());
+
+      const created = await storage.bulkCreateAllocations(Array.from(uniqueAllocations.values()));
+      await logAction(req.user?.claims?.sub, "bulk_copy", "allocation", undefined, {
+        sourceMonth,
+        targetMonth,
+        postId,
+        count: created.length,
+      });
+
+      res.status(201).json({ message: "Allocations copied successfully", count: created.length });
+    } catch (error) {
+      console.error("Error copying allocations:", error);
+      res.status(500).json({ message: "Failed to copy allocations" });
+    }
+  });
+
+  app.post(
+    "/api/allocations/import-csv",
+    isAuthenticated,
+    isAdmin,
+    upload.single("file"),
+    async (req: any, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const { postId, month } = req.body;
+        if (!postId || !month) {
+          fs.unlinkSync(req.file.path);
+          return res.status(400).json({ message: "postId and month are required" });
+        }
+
+        const parsedPostId = parseInt(postId);
+        if (isNaN(parsedPostId) || parsedPostId <= 0) {
+          fs.unlinkSync(req.file.path);
+          return res.status(400).json({ message: "Invalid postId" });
+        }
+
+        const fileContent = fs.readFileSync(req.file.path, "utf-8");
+        fs.unlinkSync(req.file.path);
+
+        const normalizedContent = fileContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        const lines = normalizedContent.trim().split("\n");
+        if (lines.length < 2) {
+          return res.status(400).json({ message: "CSV file must have headers and at least one data row" });
+        }
+
+        const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/^["']|["']$/g, ""));
+        const employeeIdIndex = headers.findIndex((h) => h === "employee_id" || h === "employeeid");
+        const dateIndex = headers.findIndex((h) => h === "date");
+        const statusIndex = headers.findIndex((h) => h === "status");
+
+        if (employeeIdIndex === -1 || dateIndex === -1 || statusIndex === -1) {
+          return res.status(400).json({
+            message: "CSV must have columns: employee_id (or employeeid), date, status",
+          });
+        }
+
+        const validStatuses = ["present", "absent", "justified", "vacation", "medical_leave"];
+        const allocationsToCreate: any[] = [];
+        const errors: string[] = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          const values = line.split(",").map((v) => v.trim().replace(/^["']|["']$/g, ""));
+          const employeeId = parseInt(values[employeeIdIndex]);
+          const dateValue = values[dateIndex];
+          const statusValue = values[statusIndex]?.toLowerCase();
+
+          if (isNaN(employeeId) || employeeId <= 0) {
+            errors.push(`Row ${i + 1}: Invalid employee_id`);
+            continue;
+          }
+
+          if (!dateValue || !/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+            errors.push(`Row ${i + 1}: Invalid date format (use YYYY-MM-DD)`);
+            continue;
+          }
+
+          if (!statusValue || !validStatuses.includes(statusValue)) {
+            errors.push(`Row ${i + 1}: Invalid status "${statusValue || 'empty'}". Valid: ${validStatuses.join(", ")}`);
+            continue;
+          }
+
+          allocationsToCreate.push({
+            employeeId,
+            postId: parsedPostId,
+            date: dateValue,
+            status: statusValue,
+          });
+        }
+
+        if (allocationsToCreate.length === 0) {
+          return res.status(400).json({
+            message: "No valid allocations found in CSV",
+            errors,
+          });
+        }
+
+        const uniqueAllocations = allocationsToCreate.reduce((acc, curr) => {
+          const key = `${curr.employeeId}-${curr.date}`;
+          acc.set(key, curr);
+          return acc;
+        }, new Map());
+
+        const created = await storage.bulkCreateAllocations(Array.from(uniqueAllocations.values()));
+        await logAction(req.user?.claims?.sub, "bulk_import", "allocation", undefined, {
+          postId,
+          month,
+          count: created.length,
+        });
+
+        res.status(201).json({
+          message: "CSV imported successfully",
+          imported: created.length,
+          errors: errors.length > 0 ? errors : undefined,
+        });
+      } catch (error) {
+        console.error("Error importing CSV:", error);
+        res.status(500).json({ message: "Failed to import CSV" });
+      }
+    }
+  );
+
   app.get("/api/occurrences", isAuthenticated, async (req, res) => {
     try {
       const { startDate, endDate, category, employeeId } = req.query;

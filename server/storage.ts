@@ -54,6 +54,9 @@ export interface IStorage {
   updateAllocation(id: number, allocation: Partial<InsertAllocation>): Promise<Allocation | undefined>;
   deleteAllocation(id: number): Promise<boolean>;
   getAllocationsByDateRange(startDate: string, endDate: string): Promise<AllocationWithRelations[]>;
+  getAllocationsByDateRangeAndPost(startDate: string, endDate: string, postId: number): Promise<AllocationWithRelations[]>;
+  bulkCreateAllocations(allocations: InsertAllocation[]): Promise<Allocation[]>;
+  deleteAllocationsByDateRangeAndPost(startDate: string, endDate: string, postId: number): Promise<number>;
 
   getOccurrences(filters?: { startDate?: string; endDate?: string; category?: string; employeeId?: number }): Promise<OccurrenceWithRelations[]>;
   getOccurrence(id: number): Promise<OccurrenceWithRelations | undefined>;
@@ -259,6 +262,39 @@ export class DatabaseStorage implements IStorage {
       orderBy: [allocations.date, allocations.employeeId],
     });
     return result;
+  }
+
+  async getAllocationsByDateRangeAndPost(startDate: string, endDate: string, postId: number): Promise<AllocationWithRelations[]> {
+    const result = await db.query.allocations.findMany({
+      where: and(
+        gte(allocations.date, startDate),
+        lte(allocations.date, endDate),
+        eq(allocations.postId, postId)
+      ),
+      with: {
+        employee: true,
+        post: true,
+      },
+      orderBy: [allocations.date, allocations.employeeId],
+    });
+    return result;
+  }
+
+  async bulkCreateAllocations(allocationData: InsertAllocation[]): Promise<Allocation[]> {
+    if (allocationData.length === 0) return [];
+    const created = await db.insert(allocations).values(allocationData).returning();
+    return created;
+  }
+
+  async deleteAllocationsByDateRangeAndPost(startDate: string, endDate: string, postId: number): Promise<number> {
+    const result = await db.delete(allocations).where(
+      and(
+        gte(allocations.date, startDate),
+        lte(allocations.date, endDate),
+        eq(allocations.postId, postId)
+      )
+    );
+    return result.rowCount ?? 0;
   }
 
   async getOccurrences(filters?: { startDate?: string; endDate?: string; category?: string; employeeId?: number }): Promise<OccurrenceWithRelations[]> {
