@@ -34,8 +34,20 @@ export default function AllocationPage() {
   const monthEnd = endOfMonth(currentDate);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
+  const startDateStr = format(monthStart, "yyyy-MM-dd");
+  const endDateStr = format(monthEnd, "yyyy-MM-dd");
+
   const { data: allocations, isLoading: allocationsLoading } = useQuery<Allocation[]>({
-    queryKey: ["/api/allocations", format(monthStart, "yyyy-MM")],
+    queryKey: ["/api/allocations", { startDate: startDateStr, endDate: endDateStr }],
+    queryFn: async () => {
+      const res = await fetch(`/api/allocations?startDate=${startDateStr}&endDate=${endDateStr}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error("Failed to fetch allocations");
+      }
+      return res.json();
+    },
   });
 
   const activeEmployees = useMemo(() => 
