@@ -157,6 +157,54 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   }
 };
 
+/**
+ * Maps development role names from the X-Dev-Role header to actual database roles.
+ * Only used in development mode for testing different role behaviors.
+ */
+export function mapDevRoleToDbRole(devRole: string): string | null {
+  const roleMap: Record<string, string> = {
+    "admin": "admin",
+    "fiscal": "fiscal_petrobras",
+    "operador": "operator_dica",
+    "visualizador": "viewer",
+  };
+  return roleMap[devRole] || null;
+}
+
+/**
+ * Gets the effective user role, considering dev role override in development mode.
+ * 
+ * DEVELOPMENT OVERRIDE MECHANISM:
+ * When NODE_ENV !== "production" and an X-Dev-Role header is present,
+ * the dev role overrides the user's actual database role for permission checks.
+ * This allows testing different role behaviors without changing user data.
+ * 
+ * SECURITY: This override is disabled in production builds.
+ * 
+ * USAGE: Call this function in any route handler that needs to check user roles.
+ * Example:
+ *   const user = await storage.getUser(userId);
+ *   const effectiveRole = getEffectiveRole(req, user?.role);
+ *   if (effectiveRole === "admin") { ... }
+ */
+export function getEffectiveRole(req: any, actualRole: string | undefined): string | undefined {
+  // Only allow dev role override outside production
+  if (process.env.NODE_ENV === "production") {
+    return actualRole;
+  }
+  
+  const devRoleHeader = req.get("X-Dev-Role");
+  if (devRoleHeader) {
+    const mappedRole = mapDevRoleToDbRole(devRoleHeader);
+    if (mappedRole) {
+      console.log(`[DEV MODE] Role override active: ${actualRole} -> ${mappedRole}`);
+      return mappedRole;
+    }
+  }
+  
+  return actualRole;
+}
+
 export const isAdmin: RequestHandler = async (req, res, next) => {
   const userSession = req.user as any;
   if (!userSession?.claims?.sub) {
@@ -164,7 +212,11 @@ export const isAdmin: RequestHandler = async (req, res, next) => {
   }
 
   const user = await storage.getUser(userSession.claims.sub);
-  if (user?.role !== "admin") {
+  
+  // Use effective role (may be overridden by dev role header in development)
+  const effectiveRole = getEffectiveRole(req, user?.role);
+  
+  if (effectiveRole !== "admin" && effectiveRole !== "admin_dica") {
     return res.status(403).json({ message: "Forbidden: Admin access required" });
   }
 

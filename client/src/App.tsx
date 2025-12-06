@@ -9,6 +9,8 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DevRoleProvider } from "@/contexts/DevRoleContext";
+import { DevRoleSwitcher } from "@/components/dev-role-switcher";
 
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
@@ -111,7 +113,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="gestao-contratual-theme">
         <TooltipProvider>
-          <AppContent />
+          {/* DevRoleProvider wraps the app to enable role switching in development */}
+          <DevRoleProvider>
+            <AppContent />
+            {/* DevRoleSwitcher only renders in development mode */}
+            <DevRoleSwitcher />
+          </DevRoleProvider>
           <Toaster />
         </TooltipProvider>
       </ThemeProvider>
