@@ -123,6 +123,23 @@ export interface IStorage {
 
   createLgpdLog(log: InsertLgpdLog): Promise<LgpdLog>;
   getLgpdLogsFiltered(filters?: { userId?: string; accessType?: string; dataCategory?: string; entityType?: string; startDate?: string; endDate?: string; limit?: number }): Promise<LgpdLogWithRelations[]>;
+
+  getPrevistoRealizadoReport(filters: { startDate: string; endDate: string; postId?: number }): Promise<{
+    summary: { totalPrevisto: number; totalRealizado: number; compliancePercentage: number };
+    byPost: Array<{
+      postId: number;
+      postCode: string;
+      postName: string;
+      previsto: number;
+      realizado: number;
+      compliance: number;
+    }>;
+    byDate: Array<{
+      date: string;
+      previsto: number;
+      realizado: number;
+    }>;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -769,6 +786,81 @@ export class DatabaseStorage implements IStorage {
       limit: filters?.limit || 500,
     });
     return result;
+  }
+
+  async getPrevistoRealizadoReport(filters: { startDate: string; endDate: string; postId?: number }): Promise<{
+    summary: { totalPrevisto: number; totalRealizado: number; compliancePercentage: number };
+    byPost: Array<{
+      postId: number;
+      postCode: string;
+      postName: string;
+      previsto: number;
+      realizado: number;
+      compliance: number;
+    }>;
+    byDate: Array<{
+      date: string;
+      previsto: number;
+      realizado: number;
+    }>;
+  }> {
+    const conditions = [
+      gte(allocations.date, filters.startDate),
+      lte(allocations.date, filters.endDate),
+    ];
+    if (filters.postId) {
+      conditions.push(eq(allocations.postId, filters.postId));
+    }
+
+    const byPostResult = await db
+      .select({
+        postId: allocations.postId,
+        postCode: servicePosts.postCode,
+        postName: servicePosts.postName,
+        previsto: sql<number>`count(*)`,
+        realizado: sql<number>`count(*) filter (where ${allocations.status} = 'present')`,
+      })
+      .from(allocations)
+      .innerJoin(servicePosts, eq(allocations.postId, servicePosts.id))
+      .where(and(...conditions))
+      .groupBy(allocations.postId, servicePosts.postCode, servicePosts.postName)
+      .orderBy(servicePosts.postCode);
+
+    const byDateResult = await db
+      .select({
+        date: allocations.date,
+        previsto: sql<number>`count(*)`,
+        realizado: sql<number>`count(*) filter (where ${allocations.status} = 'present')`,
+      })
+      .from(allocations)
+      .where(and(...conditions))
+      .groupBy(allocations.date)
+      .orderBy(allocations.date);
+
+    const totalPrevisto = byPostResult.reduce((sum, row) => sum + Number(row.previsto), 0);
+    const totalRealizado = byPostResult.reduce((sum, row) => sum + Number(row.realizado), 0);
+    const compliancePercentage = totalPrevisto > 0 ? Math.round((totalRealizado / totalPrevisto) * 100 * 10) / 10 : 0;
+
+    return {
+      summary: {
+        totalPrevisto,
+        totalRealizado,
+        compliancePercentage,
+      },
+      byPost: byPostResult.map(row => ({
+        postId: row.postId,
+        postCode: row.postCode,
+        postName: row.postName,
+        previsto: Number(row.previsto),
+        realizado: Number(row.realizado),
+        compliance: Number(row.previsto) > 0 ? Math.round((Number(row.realizado) / Number(row.previsto)) * 100 * 10) / 10 : 0,
+      })),
+      byDate: byDateResult.map(row => ({
+        date: row.date,
+        previsto: Number(row.previsto),
+        realizado: Number(row.realizado),
+      })),
+    };
   }
 }
 

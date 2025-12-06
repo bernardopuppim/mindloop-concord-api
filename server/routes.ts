@@ -1304,5 +1304,26 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/reports/previsto-realizado", isAuthenticated, async (req, res) => {
+    try {
+      const { startDate, endDate, postId } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "startDate and endDate are required" });
+      }
+
+      const report = await storage.getPrevistoRealizadoReport({
+        startDate: startDate as string,
+        endDate: endDate as string,
+        postId: postId ? parseInt(postId as string) : undefined,
+      });
+
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching previsto-realizado report:", error);
+      res.status(500).json({ message: "Failed to fetch previsto-realizado report" });
+    }
+  });
+
   return httpServer;
 }
