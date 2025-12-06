@@ -10,6 +10,9 @@ import {
   lgpdLogs,
   documentChecklists,
   feriasLicencas,
+  serviceActivities,
+  activityExecutions,
+  activityExecutionAttachments,
   type User,
   type UpsertUser,
   type Employee,
@@ -40,6 +43,14 @@ import {
   type FeriasLicencas,
   type InsertFeriasLicencas,
   type FeriasLicencasWithRelations,
+  type ServiceActivity,
+  type InsertServiceActivity,
+  type ServiceActivityWithRelations,
+  type ActivityExecution,
+  type InsertActivityExecution,
+  type ActivityExecutionWithRelations,
+  type ActivityExecutionAttachment,
+  type InsertActivityExecutionAttachment,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, like, gte, lte, or, sql } from "drizzle-orm";
@@ -172,6 +183,47 @@ export interface IStorage {
   updateFeriasLicenca(id: number, data: Partial<InsertFeriasLicencas>): Promise<FeriasLicencas | undefined>;
   deleteFeriasLicenca(id: number): Promise<boolean>;
   getActiveFeriasLicencas(): Promise<FeriasLicencasWithRelations[]>;
+
+  // Service Activities
+  getServiceActivities(postId?: number): Promise<ServiceActivityWithRelations[]>;
+  getServiceActivity(id: number): Promise<ServiceActivityWithRelations | undefined>;
+  createServiceActivity(activity: InsertServiceActivity): Promise<ServiceActivity>;
+  updateServiceActivity(id: number, activity: Partial<InsertServiceActivity>): Promise<ServiceActivity | undefined>;
+  deleteServiceActivity(id: number): Promise<boolean>;
+
+  // Activity Executions
+  getActivityExecutions(filters?: { servicePostId?: number; serviceActivityId?: number; employeeId?: number; startDate?: string; endDate?: string }): Promise<ActivityExecutionWithRelations[]>;
+  getActivityExecution(id: number): Promise<ActivityExecutionWithRelations | undefined>;
+  createActivityExecution(execution: InsertActivityExecution): Promise<ActivityExecution>;
+  updateActivityExecution(id: number, execution: Partial<InsertActivityExecution>): Promise<ActivityExecution | undefined>;
+  deleteActivityExecution(id: number): Promise<boolean>;
+  bulkUpsertActivityExecutions(executions: InsertActivityExecution[]): Promise<ActivityExecution[]>;
+
+  // Activity Execution Attachments
+  getActivityExecutionAttachments(executionId: number): Promise<ActivityExecutionAttachment[]>;
+  getActivityExecutionAttachment(id: number): Promise<ActivityExecutionAttachment | undefined>;
+  createActivityExecutionAttachment(attachment: InsertActivityExecutionAttachment): Promise<ActivityExecutionAttachment>;
+  deleteActivityExecutionAttachment(id: number): Promise<boolean>;
+
+  // Activity Execution Report
+  getActivityExecutionReport(filters: { startDate: string; endDate: string; servicePostId?: number }): Promise<{
+    summary: { totalActivities: number; totalExecutions: number; totalQuantity: number };
+    byPost: Array<{
+      postId: number;
+      postCode: string;
+      postName: string;
+      activityCount: number;
+      executionCount: number;
+      totalQuantity: number;
+    }>;
+    byActivity: Array<{
+      activityId: number;
+      activityName: string;
+      ppuUnit: string;
+      executionCount: number;
+      totalQuantity: number;
+    }>;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1071,6 +1123,267 @@ export class DatabaseStorage implements IStorage {
       orderBy: [feriasLicencas.endDate],
     });
     return result;
+  }
+
+  // Service Activities
+  async getServiceActivities(postId?: number): Promise<ServiceActivityWithRelations[]> {
+    const result = await db.query.serviceActivities.findMany({
+      where: postId ? eq(serviceActivities.servicePostId, postId) : undefined,
+      with: {
+        servicePost: true,
+      },
+      orderBy: [serviceActivities.name],
+    });
+    return result;
+  }
+
+  async getServiceActivity(id: number): Promise<ServiceActivityWithRelations | undefined> {
+    const result = await db.query.serviceActivities.findFirst({
+      where: eq(serviceActivities.id, id),
+      with: {
+        servicePost: true,
+      },
+    });
+    return result;
+  }
+
+  async createServiceActivity(activity: InsertServiceActivity): Promise<ServiceActivity> {
+    const [created] = await db.insert(serviceActivities).values(activity).returning();
+    return created;
+  }
+
+  async updateServiceActivity(id: number, activity: Partial<InsertServiceActivity>): Promise<ServiceActivity | undefined> {
+    const [updated] = await db
+      .update(serviceActivities)
+      .set({ ...activity, updatedAt: new Date() })
+      .where(eq(serviceActivities.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteServiceActivity(id: number): Promise<boolean> {
+    const result = await db.delete(serviceActivities).where(eq(serviceActivities.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Activity Executions
+  async getActivityExecutions(filters?: { servicePostId?: number; serviceActivityId?: number; employeeId?: number; startDate?: string; endDate?: string }): Promise<ActivityExecutionWithRelations[]> {
+    const conditions = [];
+    if (filters?.servicePostId) conditions.push(eq(activityExecutions.servicePostId, filters.servicePostId));
+    if (filters?.serviceActivityId) conditions.push(eq(activityExecutions.serviceActivityId, filters.serviceActivityId));
+    if (filters?.employeeId) conditions.push(eq(activityExecutions.employeeId, filters.employeeId));
+    if (filters?.startDate) conditions.push(gte(activityExecutions.date, filters.startDate));
+    if (filters?.endDate) conditions.push(lte(activityExecutions.date, filters.endDate));
+
+    const result = await db.query.activityExecutions.findMany({
+      where: conditions.length > 0 ? and(...conditions) : undefined,
+      with: {
+        serviceActivity: true,
+        servicePost: true,
+        employee: true,
+        attachments: true,
+      },
+      orderBy: [desc(activityExecutions.date)],
+    });
+    return result;
+  }
+
+  async getActivityExecution(id: number): Promise<ActivityExecutionWithRelations | undefined> {
+    const result = await db.query.activityExecutions.findFirst({
+      where: eq(activityExecutions.id, id),
+      with: {
+        serviceActivity: true,
+        servicePost: true,
+        employee: true,
+        attachments: true,
+      },
+    });
+    return result;
+  }
+
+  async createActivityExecution(execution: InsertActivityExecution): Promise<ActivityExecution> {
+    const [created] = await db.insert(activityExecutions).values(execution).returning();
+    return created;
+  }
+
+  async updateActivityExecution(id: number, execution: Partial<InsertActivityExecution>): Promise<ActivityExecution | undefined> {
+    const [updated] = await db
+      .update(activityExecutions)
+      .set({ ...execution, updatedAt: new Date() })
+      .where(eq(activityExecutions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteActivityExecution(id: number): Promise<boolean> {
+    const result = await db.delete(activityExecutions).where(eq(activityExecutions.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async bulkUpsertActivityExecutions(executions: InsertActivityExecution[]): Promise<ActivityExecution[]> {
+    if (executions.length === 0) return [];
+    const results: ActivityExecution[] = [];
+    
+    for (const execution of executions) {
+      const existing = await db.query.activityExecutions.findFirst({
+        where: and(
+          eq(activityExecutions.serviceActivityId, execution.serviceActivityId),
+          eq(activityExecutions.servicePostId, execution.servicePostId),
+          eq(activityExecutions.date, execution.date)
+        ),
+      });
+      
+      if (existing) {
+        const [updated] = await db
+          .update(activityExecutions)
+          .set({ ...execution, updatedAt: new Date() })
+          .where(eq(activityExecutions.id, existing.id))
+          .returning();
+        results.push(updated);
+      } else {
+        const [created] = await db.insert(activityExecutions).values(execution).returning();
+        results.push(created);
+      }
+    }
+    
+    return results;
+  }
+
+  // Activity Execution Attachments
+  async getActivityExecutionAttachments(executionId: number): Promise<ActivityExecutionAttachment[]> {
+    return db.select().from(activityExecutionAttachments)
+      .where(eq(activityExecutionAttachments.activityExecutionId, executionId))
+      .orderBy(desc(activityExecutionAttachments.uploadedAt));
+  }
+
+  async getActivityExecutionAttachment(id: number): Promise<ActivityExecutionAttachment | undefined> {
+    const [attachment] = await db.select().from(activityExecutionAttachments)
+      .where(eq(activityExecutionAttachments.id, id));
+    return attachment;
+  }
+
+  async createActivityExecutionAttachment(attachment: InsertActivityExecutionAttachment): Promise<ActivityExecutionAttachment> {
+    const [created] = await db.insert(activityExecutionAttachments).values(attachment).returning();
+    return created;
+  }
+
+  async deleteActivityExecutionAttachment(id: number): Promise<boolean> {
+    const result = await db.delete(activityExecutionAttachments).where(eq(activityExecutionAttachments.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Activity Execution Report
+  async getActivityExecutionReport(filters: { startDate: string; endDate: string; servicePostId?: number }): Promise<{
+    summary: { totalActivities: number; totalExecutions: number; totalQuantity: number };
+    byPost: Array<{
+      postId: number;
+      postCode: string;
+      postName: string;
+      activityCount: number;
+      executionCount: number;
+      totalQuantity: number;
+    }>;
+    byActivity: Array<{
+      activityId: number;
+      activityName: string;
+      ppuUnit: string;
+      executionCount: number;
+      totalQuantity: number;
+    }>;
+  }> {
+    const conditions = [
+      gte(activityExecutions.date, filters.startDate),
+      lte(activityExecutions.date, filters.endDate),
+    ];
+    if (filters.servicePostId) {
+      conditions.push(eq(activityExecutions.servicePostId, filters.servicePostId));
+    }
+
+    const executions = await db.query.activityExecutions.findMany({
+      where: and(...conditions),
+      with: {
+        serviceActivity: true,
+        servicePost: true,
+      },
+    });
+
+    const postMap = new Map<number, {
+      postId: number;
+      postCode: string;
+      postName: string;
+      activityIds: Set<number>;
+      executionCount: number;
+      totalQuantity: number;
+    }>();
+
+    const activityMap = new Map<number, {
+      activityId: number;
+      activityName: string;
+      ppuUnit: string;
+      executionCount: number;
+      totalQuantity: number;
+    }>();
+
+    let totalExecutions = 0;
+    let totalQuantity = 0;
+    const allActivityIds = new Set<number>();
+
+    for (const exec of executions) {
+      totalExecutions++;
+      totalQuantity += exec.quantity;
+      allActivityIds.add(exec.serviceActivityId);
+
+      if (exec.servicePost) {
+        const postId = exec.servicePost.id;
+        if (!postMap.has(postId)) {
+          postMap.set(postId, {
+            postId,
+            postCode: exec.servicePost.postCode,
+            postName: exec.servicePost.postName,
+            activityIds: new Set(),
+            executionCount: 0,
+            totalQuantity: 0,
+          });
+        }
+        const post = postMap.get(postId)!;
+        post.activityIds.add(exec.serviceActivityId);
+        post.executionCount++;
+        post.totalQuantity += exec.quantity;
+      }
+
+      if (exec.serviceActivity) {
+        const activityId = exec.serviceActivity.id;
+        if (!activityMap.has(activityId)) {
+          activityMap.set(activityId, {
+            activityId,
+            activityName: exec.serviceActivity.name,
+            ppuUnit: exec.serviceActivity.ppuUnit,
+            executionCount: 0,
+            totalQuantity: 0,
+          });
+        }
+        const activity = activityMap.get(activityId)!;
+        activity.executionCount++;
+        activity.totalQuantity += exec.quantity;
+      }
+    }
+
+    return {
+      summary: {
+        totalActivities: allActivityIds.size,
+        totalExecutions,
+        totalQuantity,
+      },
+      byPost: Array.from(postMap.values()).map(p => ({
+        postId: p.postId,
+        postCode: p.postCode,
+        postName: p.postName,
+        activityCount: p.activityIds.size,
+        executionCount: p.executionCount,
+        totalQuantity: p.totalQuantity,
+      })),
+      byActivity: Array.from(activityMap.values()),
+    };
   }
 }
 
