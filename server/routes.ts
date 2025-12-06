@@ -7,7 +7,9 @@ import {
   insertServicePostSchema,
   insertAllocationSchema,
   insertOccurrenceSchema,
+  insertNotificationSettingsSchema,
 } from "@shared/schema";
+import { emailService } from "./emailService";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -802,6 +804,233 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching audit logs:", error);
       res.status(500).json({ message: "Failed to fetch audit logs" });
+    }
+  });
+
+  app.get("/api/notification-settings", isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      const settings = await storage.getNotificationSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching notification settings:", error);
+      res.status(500).json({ message: "Failed to fetch notification settings" });
+    }
+  });
+
+  app.get("/api/notification-settings/my", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const settings = await storage.getNotificationSettingsByUser(userId);
+      res.json(settings || null);
+    } catch (error) {
+      console.error("Error fetching user notification settings:", error);
+      res.status(500).json({ message: "Failed to fetch notification settings" });
+    }
+  });
+
+  app.post("/api/notification-settings", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const parsed = insertNotificationSettingsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+      }
+      const settings = await storage.createNotificationSettings(parsed.data);
+      await logAction(req.user?.claims?.sub, "create", "notification_settings", settings.id);
+      res.status(201).json(settings);
+    } catch (error) {
+      console.error("Error creating notification settings:", error);
+      res.status(500).json({ message: "Failed to create notification settings" });
+    }
+  });
+
+  app.patch("/api/notification-settings/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const settings = await storage.updateNotificationSettings(id, req.body);
+      if (!settings) {
+        return res.status(404).json({ message: "Notification settings not found" });
+      }
+      await logAction(req.user?.claims?.sub, "update", "notification_settings", id, req.body);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating notification settings:", error);
+      res.status(500).json({ message: "Failed to update notification settings" });
+    }
+  });
+
+  app.delete("/api/notification-settings/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteNotificationSettings(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Notification settings not found" });
+      }
+      await logAction(req.user?.claims?.sub, "delete", "notification_settings", id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting notification settings:", error);
+      res.status(500).json({ message: "Failed to delete notification settings" });
+    }
+  });
+
+  app.get("/api/notifications/status", isAuthenticated, async (_req, res) => {
+    try {
+      res.json({
+        emailServiceConfigured: emailService.isReady(),
+        smtpConfigured: !!process.env.SMTP_HOST,
+      });
+    } catch (error) {
+      console.error("Error checking notification status:", error);
+      res.status(500).json({ message: "Failed to check notification status" });
+    }
+  });
+
+  app.post("/api/notifications/test", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email address is required" });
+      }
+
+      if (!emailService.isReady()) {
+        return res.status(400).json({ 
+          message: "Email service not configured. Please set SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS environment variables." 
+        });
+      }
+
+      const sent = await emailService.sendEmail({
+        to: email,
+        subject: "Test Notification - Contract Management System",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #1a365d;">Test Notification</h2>
+            <p>This is a test email from the Contract Management System.</p>
+            <p>If you received this, your email notifications are configured correctly.</p>
+          </div>
+        `,
+        text: "This is a test email from the Contract Management System.",
+      });
+
+      if (sent) {
+        res.json({ message: "Test email sent successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to send test email" });
+      }
+    } catch (error) {
+      console.error("Error sending test notification:", error);
+      res.status(500).json({ message: "Failed to send test notification" });
+    }
+  });
+
+  app.post("/api/notifications/send-document-expiration", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      if (!emailService.isReady()) {
+        return res.status(400).json({ message: "Email service not configured" });
+      }
+
+      const recipients = await storage.getActiveNotificationRecipients('documents');
+      if (recipients.length === 0) {
+        return res.status(400).json({ message: "No recipients configured for document expiration notifications" });
+      }
+
+      const expiredDocs = await storage.getExpiredDocuments();
+      const expiringDocs = await storage.getExpiringDocuments(30);
+
+      if (expiredDocs.length === 0 && expiringDocs.length === 0) {
+        return res.json({ message: "No expired or expiring documents to notify about" });
+      }
+
+      const today = new Date();
+      const documents = [
+        ...expiredDocs.map(doc => ({
+          documentType: doc.documentType,
+          originalName: doc.originalName,
+          expirationDate: doc.expirationDate || '',
+          employeeName: doc.employee?.name,
+          postName: doc.post?.postName,
+          daysUntilExpiration: doc.expirationDate 
+            ? Math.floor((new Date(doc.expirationDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+            : 0,
+        })),
+        ...expiringDocs.map(doc => ({
+          documentType: doc.documentType,
+          originalName: doc.originalName,
+          expirationDate: doc.expirationDate || '',
+          employeeName: doc.employee?.name,
+          postName: doc.post?.postName,
+          daysUntilExpiration: doc.expirationDate 
+            ? Math.floor((new Date(doc.expirationDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+            : 0,
+        })),
+      ];
+
+      let sentCount = 0;
+      for (const recipient of recipients) {
+        const sent = await emailService.sendDocumentExpirationNotification(recipient, documents);
+        if (sent) sentCount++;
+      }
+
+      await logAction(req.user?.claims?.sub, "send_notification", "document_expiration", undefined, {
+        recipientCount: recipients.length,
+        sentCount,
+        expiredCount: expiredDocs.length,
+        expiringCount: expiringDocs.length,
+      });
+
+      res.json({ 
+        message: `Document expiration notifications sent to ${sentCount} of ${recipients.length} recipients`,
+        expiredDocuments: expiredDocs.length,
+        expiringDocuments: expiringDocs.length,
+      });
+    } catch (error) {
+      console.error("Error sending document expiration notifications:", error);
+      res.status(500).json({ message: "Failed to send document expiration notifications" });
+    }
+  });
+
+  app.post("/api/notifications/send-daily-summary", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      if (!emailService.isReady()) {
+        return res.status(400).json({ message: "Email service not configured" });
+      }
+
+      const recipients = await storage.getActiveNotificationRecipients('daily');
+      if (recipients.length === 0) {
+        return res.status(400).json({ message: "No recipients configured for daily summary notifications" });
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      const stats = await storage.getDashboardStats();
+      const expiredDocs = await storage.getExpiredDocuments();
+      const expiringDocs = await storage.getExpiringDocuments(30);
+
+      const summary = {
+        date: today,
+        newOccurrences: stats.recentOccurrences,
+        missingAllocations: 0,
+        expiredDocuments: expiredDocs.length,
+        expiringDocuments: expiringDocs.length,
+      };
+
+      let sentCount = 0;
+      for (const recipient of recipients) {
+        const sent = await emailService.sendDailySummaryNotification(recipient, summary);
+        if (sent) sentCount++;
+      }
+
+      await logAction(req.user?.claims?.sub, "send_notification", "daily_summary", undefined, {
+        recipientCount: recipients.length,
+        sentCount,
+        summary,
+      });
+
+      res.json({ 
+        message: `Daily summary sent to ${sentCount} of ${recipients.length} recipients`,
+        summary,
+      });
+    } catch (error) {
+      console.error("Error sending daily summary:", error);
+      res.status(500).json({ message: "Failed to send daily summary" });
     }
   });
 

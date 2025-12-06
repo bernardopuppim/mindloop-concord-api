@@ -120,10 +120,32 @@ export const auditLogs = pgTable("audit_logs", {
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
+// Notification Settings table
+export const notificationSettings = pgTable("notification_settings", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  email: varchar("email", { length: 255 }).notNull(),
+  notifyNewOccurrences: boolean("notify_new_occurrences").default(true).notNull(),
+  notifyMissingAllocations: boolean("notify_missing_allocations").default(true).notNull(),
+  notifyDocumentExpiration: boolean("notify_document_expiration").default(true).notNull(),
+  notifyDailySummary: boolean("notify_daily_summary").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   documents: many(documents),
   auditLogs: many(auditLogs),
+  notificationSettings: many(notificationSettings),
+}));
+
+export const notificationSettingsRelations = relations(notificationSettings, ({ one }) => ({
+  user: one(users, {
+    fields: [notificationSettings.userId],
+    references: [users.id],
+  }),
 }));
 
 export const employeesRelations = relations(employees, ({ many }) => ({
@@ -220,6 +242,12 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   timestamp: true,
 });
 
+export const insertNotificationSettingsSchema = createInsertSchema(notificationSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -235,6 +263,8 @@ export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertNotificationSettings = z.infer<typeof insertNotificationSettingsSchema>;
+export type NotificationSettings = typeof notificationSettings.$inferSelect;
 
 // Extended types with relations
 export type AllocationWithRelations = Allocation & {
@@ -253,5 +283,9 @@ export type DocumentWithRelations = Document & {
 };
 
 export type AuditLogWithRelations = AuditLog & {
+  user?: User | null;
+};
+
+export type NotificationSettingsWithRelations = NotificationSettings & {
   user?: User | null;
 };

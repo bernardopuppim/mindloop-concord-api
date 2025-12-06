@@ -23,6 +23,7 @@ import Allocation from "@/pages/allocation";
 import OccurrencesIndex from "@/pages/occurrences/index";
 import DocumentsIndex from "@/pages/documents/index";
 import Reports from "@/pages/reports";
+import Notifications from "@/pages/notifications/index";
 import Admin from "@/pages/admin";
 
 function AuthenticatedRouter() {
@@ -41,6 +42,7 @@ function AuthenticatedRouter() {
       <Route path="/occurrences" component={OccurrencesIndex} />
       <Route path="/documents" component={DocumentsIndex} />
       <Route path="/reports" component={Reports} />
+      <Route path="/notifications" component={Notifications} />
       <Route path="/admin" component={Admin} />
       <Route component={NotFound} />
     </Switch>

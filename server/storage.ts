@@ -6,6 +6,7 @@ import {
   occurrences,
   documents,
   auditLogs,
+  notificationSettings,
   type User,
   type UpsertUser,
   type Employee,
@@ -24,6 +25,9 @@ import {
   type AuditLog,
   type InsertAuditLog,
   type AuditLogWithRelations,
+  type NotificationSettings,
+  type InsertNotificationSettings,
+  type NotificationSettingsWithRelations,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, like, gte, lte, or, sql } from "drizzle-orm";
@@ -103,6 +107,13 @@ export interface IStorage {
     activeEmployeeRate: number;
     occurrenceRate: number;
   }>;
+
+  getNotificationSettings(): Promise<NotificationSettingsWithRelations[]>;
+  getNotificationSettingsByUser(userId: string): Promise<NotificationSettings | undefined>;
+  createNotificationSettings(settings: InsertNotificationSettings): Promise<NotificationSettings>;
+  updateNotificationSettings(id: number, settings: Partial<InsertNotificationSettings>): Promise<NotificationSettings | undefined>;
+  deleteNotificationSettings(id: number): Promise<boolean>;
+  getActiveNotificationRecipients(notificationType: 'occurrences' | 'allocations' | 'documents' | 'daily'): Promise<string[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -626,6 +637,68 @@ export class DatabaseStorage implements IStorage {
       activeEmployeeRate: safeDiv(activeEmployees, totalEmployees),
       occurrenceRate: activeEmployees > 0 ? Math.round((occurrenceCount / activeEmployees) * 10) / 10 : 0,
     };
+  }
+
+  async getNotificationSettings(): Promise<NotificationSettingsWithRelations[]> {
+    const result = await db.query.notificationSettings.findMany({
+      with: {
+        user: true,
+      },
+      orderBy: [desc(notificationSettings.createdAt)],
+    });
+    return result;
+  }
+
+  async getNotificationSettingsByUser(userId: string): Promise<NotificationSettings | undefined> {
+    const [settings] = await db
+      .select()
+      .from(notificationSettings)
+      .where(eq(notificationSettings.userId, userId));
+    return settings;
+  }
+
+  async createNotificationSettings(settings: InsertNotificationSettings): Promise<NotificationSettings> {
+    const [created] = await db.insert(notificationSettings).values(settings).returning();
+    return created;
+  }
+
+  async updateNotificationSettings(id: number, settings: Partial<InsertNotificationSettings>): Promise<NotificationSettings | undefined> {
+    const [updated] = await db
+      .update(notificationSettings)
+      .set({ ...settings, updatedAt: new Date() })
+      .where(eq(notificationSettings.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteNotificationSettings(id: number): Promise<boolean> {
+    const result = await db.delete(notificationSettings).where(eq(notificationSettings.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getActiveNotificationRecipients(notificationType: 'occurrences' | 'allocations' | 'documents' | 'daily'): Promise<string[]> {
+    let condition;
+    switch (notificationType) {
+      case 'occurrences':
+        condition = eq(notificationSettings.notifyNewOccurrences, true);
+        break;
+      case 'allocations':
+        condition = eq(notificationSettings.notifyMissingAllocations, true);
+        break;
+      case 'documents':
+        condition = eq(notificationSettings.notifyDocumentExpiration, true);
+        break;
+      case 'daily':
+        condition = eq(notificationSettings.notifyDailySummary, true);
+        break;
+    }
+
+    const settings = await db
+      .select({ email: notificationSettings.email })
+      .from(notificationSettings)
+      .where(and(eq(notificationSettings.isActive, true), condition));
+
+    return settings.map(s => s.email);
   }
 }
 

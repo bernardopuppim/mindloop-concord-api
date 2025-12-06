@@ -10,6 +10,7 @@ import {
   Settings,
   LogOut,
   Building2,
+  Bell,
 } from "lucide-react";
 import {
   Sidebar,
@@ -67,6 +68,11 @@ const adminNavItems = [
     title: "Reports",
     url: "/reports",
     icon: BarChart3,
+  },
+  {
+    title: "Notifications",
+    url: "/notifications",
+    icon: Bell,
   },
   {
     title: "Admin Settings",
