@@ -31,6 +31,7 @@ import Auditoria from "@/pages/auditoria";
 import LgpdLogs from "@/pages/lgpd-logs";
 import FeriasLicencasIndex from "@/pages/ferias-licencas/index";
 import AlertsIndex from "@/pages/alerts/index";
+import ActivityExecutions from "@/pages/activity-executions";
 
 function AuthenticatedRouter() {
   return (
@@ -54,6 +55,7 @@ function AuthenticatedRouter() {
       <Route path="/lgpd-logs" component={LgpdLogs} />
       <Route path="/ferias-licencas" component={FeriasLicencasIndex} />
       <Route path="/alerts" component={AlertsIndex} />
+      <Route path="/activity-executions" component={ActivityExecutions} />
       <Route component={NotFound} />
     </Switch>
   );

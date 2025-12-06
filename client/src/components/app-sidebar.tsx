@@ -14,6 +14,7 @@ import {
   ClipboardList,
   ShieldCheck,
   CalendarCheck,
+  ListChecks,
 } from "lucide-react";
 import {
   Sidebar,
@@ -75,6 +76,11 @@ const mainNavItems = [
     title: translations.nav.alerts,
     url: "/alerts",
     icon: AlertTriangle,
+  },
+  {
+    title: "Execuções de Atividades",
+    url: "/activity-executions",
+    icon: ListChecks,
   },
 ];
 
