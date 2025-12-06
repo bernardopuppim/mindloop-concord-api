@@ -25,6 +25,7 @@ import DocumentsIndex from "@/pages/documents/index";
 import Reports from "@/pages/reports";
 import Notifications from "@/pages/notifications/index";
 import Admin from "@/pages/admin";
+import Auditoria from "@/pages/auditoria";
 
 function AuthenticatedRouter() {
   return (
@@ -44,6 +45,7 @@ function AuthenticatedRouter() {
       <Route path="/reports" component={Reports} />
       <Route path="/notifications" component={Notifications} />
       <Route path="/admin" component={Admin} />
+      <Route path="/auditoria" component={Auditoria} />
       <Route component={NotFound} />
     </Switch>
   );

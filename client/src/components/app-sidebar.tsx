@@ -11,6 +11,7 @@ import {
   LogOut,
   Bell,
   AlertTriangle,
+  ClipboardList,
 } from "lucide-react";
 import {
   Sidebar,
@@ -80,6 +81,11 @@ const adminNavItems = [
     title: translations.nav.notifications,
     url: "/notifications",
     icon: Bell,
+  },
+  {
+    title: "Auditoria",
+    url: "/auditoria",
+    icon: ClipboardList,
   },
   {
     title: translations.nav.adminSettings,

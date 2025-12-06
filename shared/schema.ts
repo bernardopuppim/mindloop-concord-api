@@ -121,7 +121,7 @@ export const documents = pgTable("documents", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Audit Logs table
+// Audit Logs table (enhanced with diff tracking)
 export const auditLogs = pgTable("audit_logs", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
@@ -129,6 +129,8 @@ export const auditLogs = pgTable("audit_logs", {
   entityType: varchar("entity_type", { length: 100 }).notNull(),
   entityId: varchar("entity_id", { length: 100 }),
   details: jsonb("details"),
+  diffBefore: jsonb("diff_before"),
+  diffAfter: jsonb("diff_after"),
   timestamp: timestamp("timestamp").defaultNow(),
 });
 

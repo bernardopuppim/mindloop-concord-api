@@ -77,7 +77,9 @@ export interface IStorage {
   getExpiredDocuments(): Promise<DocumentWithRelations[]>;
 
   getAuditLogs(limit?: number): Promise<AuditLogWithRelations[]>;
+  getAuditLogsFiltered(filters?: { userId?: string; entityType?: string; action?: string; startDate?: string; endDate?: string; limit?: number }): Promise<AuditLogWithRelations[]>;
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  createAuditLogWithDiff(log: InsertAuditLog & { diffBefore?: any; diffAfter?: any }): Promise<AuditLog>;
 
   getDashboardStats(): Promise<{
     totalEmployees: number;
@@ -479,8 +481,40 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async getAuditLogsFiltered(filters?: { userId?: string; entityType?: string; action?: string; startDate?: string; endDate?: string; limit?: number }): Promise<AuditLogWithRelations[]> {
+    const conditions = [];
+    if (filters?.userId) conditions.push(eq(auditLogs.userId, filters.userId));
+    if (filters?.entityType) conditions.push(eq(auditLogs.entityType, filters.entityType));
+    if (filters?.action) conditions.push(eq(auditLogs.action, filters.action));
+    if (filters?.startDate) conditions.push(gte(auditLogs.timestamp, new Date(filters.startDate)));
+    if (filters?.endDate) {
+      const endDate = new Date(filters.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      conditions.push(lte(auditLogs.timestamp, endDate));
+    }
+
+    const result = await db.query.auditLogs.findMany({
+      where: conditions.length > 0 ? and(...conditions) : undefined,
+      with: {
+        user: true,
+      },
+      orderBy: [desc(auditLogs.timestamp)],
+      limit: filters?.limit || 500,
+    });
+    return result;
+  }
+
   async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
     const [created] = await db.insert(auditLogs).values(log).returning();
+    return created;
+  }
+
+  async createAuditLogWithDiff(log: InsertAuditLog & { diffBefore?: any; diffAfter?: any }): Promise<AuditLog> {
+    const [created] = await db.insert(auditLogs).values({
+      ...log,
+      diffBefore: log.diffBefore || null,
+      diffAfter: log.diffAfter || null,
+    } as any).returning();
     return created;
   }
 

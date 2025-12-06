@@ -1,0 +1,194 @@
+I want to expand the system with the following features, implemented in a structured and integrated way.
+All changes must respect the existing architecture, database schema, and frontend patterns.
+Do not remove any existing functionality. Add only the required modules and extend existing ones when necessary.
+
+🔵 1. FULL AUDIT TRAIL (Auditoria Completa)
+
+Implement a full audit logging system that records every CREATE, UPDATE, and DELETE operation performed by any user.
+
+Requirements:
+
+Create a table audit_logs with:
+
+id
+
+user_id
+
+action (“CREATE”, “UPDATE”, “DELETE”)
+
+entity (“employee”, “post”, “allocation”, “occurrence”, “document”, etc.)
+
+entity_id
+
+timestamp
+
+diff_before (JSON)
+
+diff_after (JSON)
+
+Wrap all database write operations with an audit logger.
+
+Add a UI page under Admin Settings → “Auditoria”.
+
+Allow filtering by:
+
+user
+
+entity
+
+date range
+
+action
+
+Provide CSV export.
+
+🔵 2. LGPD LOGGING (Acesso a Dados Sensíveis)
+
+Implement basic LGPD compliance logging for sensitive data access.
+
+Requirements:
+
+Create table lgpd_logs with:
+
+id
+
+user_id
+
+entity
+
+entity_id
+
+purpose (“visualização”, “edição”, etc.)
+
+timestamp
+
+Log automatic entries whenever:
+
+an employee profile is viewed
+
+documents with personal data are accessed
+
+allocations containing employee identifiers are viewed
+
+Add Admin UI section: “Logs LGPD”
+
+filters for user, entity, date
+
+CSV export
+
+Do NOT enforce consent workflows now. Only logging.
+
+🔵 3. PREVISTO × REALIZADO MODULE (Contract Performance Analysis)
+
+Add a module that compares:
+
+quantidade prevista de profissionais por posto (from Service Posts)
+
+x
+
+quantidade realmente alocada no período (from allocations)
+
+Requirements:
+
+Extend Service Posts to include:
+
+quantidade_prevista
+
+dias_previstos (if not present)
+
+Create backend function:
+calculateContractPerformance(month, year) returning:
+
+previsto_total
+
+realizado_total
+
+percentual_realizado
+
+gaps_per_posto
+
+tendência (últimos 3 meses)
+
+Create UI page “Previsto × Realizado” under Reports.
+
+Include charts (bars + line trend).
+
+Include CSV export.
+
+🔵 4. DOCUMENT MANAGEMENT (Incremental Improvements)
+
+Enhance the existing Documents module.
+
+Add fields:
+
+categoria (Atestado, Certidão, Relatório Mensal, Evidência, Treinamento, Outros)
+
+mes_referencia
+
+observacoes
+
+data_validade (optional, used for alerts)
+
+Implement:
+
+Filters by category, month, validade
+
+“Documentos Vencidos” and “Expirando em 30 dias” sections
+
+Ability to re-upload document versions
+
+Cleaner UI with grouped sections per employee/post
+
+Add missing document checklist per posto (from Anexo 1B categories)
+
+🔵 5. FÉRIAS & LICENÇAS MODULE
+
+Create a simple but complete module for managing vacation and leave periods.
+
+Requirements:
+
+Table ferias_licencas with:
+
+id
+
+employee_id
+
+tipo (“Férias”, “Licença médica”, “Licença não remunerada”, “Outros”)
+
+data_inicio
+
+data_fim
+
+observacoes
+
+CRUD interface under Employees → “Férias/Licenças”.
+
+Automatically mark the employee’s allocation status as “Em Férias” or “Licença” during the period.
+
+Dashboard card showing:
+
+funcionários em férias hoje
+
+próximos períodos agendados
+
+histórico dos últimos 6 meses
+
+🔧 6. GENERAL REQUIREMENTS
+
+Apply migrations for all schema changes.
+
+Ensure compatibility with existing data.
+
+Do not break reports or dashboard.
+
+After implementation, provide a summary of:
+
+updated files
+
+new tables
+
+migrations
+
+new components
+
+testing instructions

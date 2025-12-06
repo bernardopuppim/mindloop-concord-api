@@ -41,15 +41,19 @@ async function logAction(
   action: string,
   entityType: string,
   entityId?: string | number,
-  details?: any
+  details?: any,
+  diffBefore?: any,
+  diffAfter?: any
 ) {
   try {
-    await storage.createAuditLog({
+    await storage.createAuditLogWithDiff({
       userId: userId || null,
       action,
       entityType,
       entityId: entityId?.toString() || null,
       details,
+      diffBefore: diffBefore || null,
+      diffAfter: diffAfter || null,
     });
   } catch (error) {
     console.error("Failed to create audit log:", error);
@@ -162,11 +166,15 @@ export async function registerRoutes(
   app.patch("/api/employees/:id", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      const before = await storage.getEmployee(id);
+      if (!before) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
       const employee = await storage.updateEmployee(id, req.body);
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
       }
-      await logAction(req.user?.claims?.sub, "update", "employee", id, req.body);
+      await logAction(req.user?.claims?.sub, "update", "employee", id, req.body, before, employee);
       res.json(employee);
     } catch (error: any) {
       console.error("Error updating employee:", error);
@@ -180,11 +188,15 @@ export async function registerRoutes(
   app.delete("/api/employees/:id", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      const before = await storage.getEmployee(id);
+      if (!before) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
       const deleted = await storage.deleteEmployee(id);
       if (!deleted) {
         return res.status(404).json({ message: "Employee not found" });
       }
-      await logAction(req.user?.claims?.sub, "delete", "employee", id);
+      await logAction(req.user?.claims?.sub, "delete", "employee", id, null, before, null);
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting employee:", error);
@@ -240,11 +252,15 @@ export async function registerRoutes(
   app.patch("/api/service-posts/:id", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      const before = await storage.getServicePost(id);
+      if (!before) {
+        return res.status(404).json({ message: "Service post not found" });
+      }
       const post = await storage.updateServicePost(id, req.body);
       if (!post) {
         return res.status(404).json({ message: "Service post not found" });
       }
-      await logAction(req.user?.claims?.sub, "update", "service_post", id, req.body);
+      await logAction(req.user?.claims?.sub, "update", "service_post", id, req.body, before, post);
       res.json(post);
     } catch (error: any) {
       console.error("Error updating service post:", error);
@@ -258,11 +274,15 @@ export async function registerRoutes(
   app.delete("/api/service-posts/:id", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      const before = await storage.getServicePost(id);
+      if (!before) {
+        return res.status(404).json({ message: "Service post not found" });
+      }
       const deleted = await storage.deleteServicePost(id);
       if (!deleted) {
         return res.status(404).json({ message: "Service post not found" });
       }
-      await logAction(req.user?.claims?.sub, "delete", "service_post", id);
+      await logAction(req.user?.claims?.sub, "delete", "service_post", id, null, before, null);
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting service post:", error);
@@ -325,11 +345,15 @@ export async function registerRoutes(
   app.patch("/api/allocations/:id", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      const before = await storage.getAllocation(id);
+      if (!before) {
+        return res.status(404).json({ message: "Allocation not found" });
+      }
       const allocation = await storage.updateAllocation(id, req.body);
       if (!allocation) {
         return res.status(404).json({ message: "Allocation not found" });
       }
-      await logAction(req.user?.claims?.sub, "update", "allocation", id, req.body);
+      await logAction(req.user?.claims?.sub, "update", "allocation", id, req.body, before, allocation);
       res.json(allocation);
     } catch (error) {
       console.error("Error updating allocation:", error);
@@ -340,11 +364,15 @@ export async function registerRoutes(
   app.delete("/api/allocations/:id", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      const before = await storage.getAllocation(id);
+      if (!before) {
+        return res.status(404).json({ message: "Allocation not found" });
+      }
       const deleted = await storage.deleteAllocation(id);
       if (!deleted) {
         return res.status(404).json({ message: "Allocation not found" });
       }
-      await logAction(req.user?.claims?.sub, "delete", "allocation", id);
+      await logAction(req.user?.claims?.sub, "delete", "allocation", id, null, before, null);
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting allocation:", error);
@@ -594,11 +622,15 @@ export async function registerRoutes(
   app.patch("/api/occurrences/:id", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      const before = await storage.getOccurrence(id);
+      if (!before) {
+        return res.status(404).json({ message: "Occurrence not found" });
+      }
       const occurrence = await storage.updateOccurrence(id, req.body);
       if (!occurrence) {
         return res.status(404).json({ message: "Occurrence not found" });
       }
-      await logAction(req.user?.claims?.sub, "update", "occurrence", id, req.body);
+      await logAction(req.user?.claims?.sub, "update", "occurrence", id, req.body, before, occurrence);
       res.json(occurrence);
     } catch (error) {
       console.error("Error updating occurrence:", error);
@@ -609,11 +641,15 @@ export async function registerRoutes(
   app.delete("/api/occurrences/:id", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      const before = await storage.getOccurrence(id);
+      if (!before) {
+        return res.status(404).json({ message: "Occurrence not found" });
+      }
       const deleted = await storage.deleteOccurrence(id);
       if (!deleted) {
         return res.status(404).json({ message: "Occurrence not found" });
       }
-      await logAction(req.user?.claims?.sub, "delete", "occurrence", id);
+      await logAction(req.user?.claims?.sub, "delete", "occurrence", id, null, before, null);
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting occurrence:", error);
@@ -1031,6 +1067,74 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error sending daily summary:", error);
       res.status(500).json({ message: "Failed to send daily summary" });
+    }
+  });
+
+  // Admin Audit Logs Routes
+  app.get("/api/admin/audit-logs", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { userId, entityType, action, startDate, endDate, limit } = req.query;
+      const logs = await storage.getAuditLogsFiltered({
+        userId: userId as string | undefined,
+        entityType: entityType as string | undefined,
+        action: action as string | undefined,
+        startDate: startDate as string | undefined,
+        endDate: endDate as string | undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching audit logs:", error);
+      res.status(500).json({ message: "Failed to fetch audit logs" });
+    }
+  });
+
+  app.get("/api/admin/audit-logs/export", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { userId, entityType, action, startDate, endDate } = req.query;
+      const logs = await storage.getAuditLogsFiltered({
+        userId: userId as string | undefined,
+        entityType: entityType as string | undefined,
+        action: action as string | undefined,
+        startDate: startDate as string | undefined,
+        endDate: endDate as string | undefined,
+        limit: 10000,
+      });
+
+      const csvHeader = "ID,Data/Hora,Usuário,Ação,Entidade,ID Entidade,Detalhes\n";
+      const csvRows = logs.map(log => {
+        const timestamp = log.timestamp ? new Date(log.timestamp).toLocaleString('pt-BR') : '';
+        const userName = log.user ? `${log.user.firstName || ''} ${log.user.lastName || ''}`.trim() : 'Sistema';
+        const details = log.details ? JSON.stringify(log.details).replace(/"/g, '""') : '';
+        return `${log.id},"${timestamp}","${userName}","${log.action}","${log.entityType}","${log.entityId || ''}","${details}"`;
+      }).join("\n");
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=audit_logs_${new Date().toISOString().split('T')[0]}.csv`);
+      res.send('\uFEFF' + csvHeader + csvRows);
+    } catch (error) {
+      console.error("Error exporting audit logs:", error);
+      res.status(500).json({ message: "Failed to export audit logs" });
+    }
+  });
+
+  app.get("/api/admin/audit-logs/entity-types", isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      const entityTypes = ["employee", "service_post", "allocation", "occurrence", "document", "user", "notification_settings", "alert"];
+      res.json(entityTypes);
+    } catch (error) {
+      console.error("Error fetching entity types:", error);
+      res.status(500).json({ message: "Failed to fetch entity types" });
+    }
+  });
+
+  app.get("/api/admin/audit-logs/actions", isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      const actions = ["create", "update", "delete", "bulk_copy", "bulk_import", "send_notification", "mark_treated", "resolve"];
+      res.json(actions);
+    } catch (error) {
+      console.error("Error fetching actions:", error);
+      res.status(500).json({ message: "Failed to fetch actions" });
     }
   });
 
