@@ -124,6 +124,28 @@ export default function ServicePostView({ postId }: ServicePostViewProps) {
                 <p className="text-base">{servicePost.createdAt ? formatDate(servicePost.createdAt) : "N/A"}</p>
               </div>
             </div>
+
+            <div className="border-t pt-4 mt-4">
+              <h4 className="text-sm font-semibold mb-4">Anexo 1A - Dados Contratuais</h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">{translations.servicePosts.tipoPosto}</p>
+                  <p className="text-base" data-testid="text-tipo-posto">{servicePost.tipoPosto || "Não informado"}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">{translations.servicePosts.horarioTrabalho}</p>
+                  <p className="text-base" data-testid="text-horario-trabalho">{servicePost.horarioTrabalho || "Não informado"}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">{translations.servicePosts.escalaRegime}</p>
+                  <p className="text-base" data-testid="text-escala-regime">{servicePost.escalaRegime || "Não informado"}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">{translations.servicePosts.quantidadePrevista}</p>
+                  <p className="text-base" data-testid="text-quantidade-prevista">{servicePost.quantidadePrevista ?? "Não informado"}</p>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

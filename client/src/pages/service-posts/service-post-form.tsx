@@ -22,6 +22,10 @@ const formSchema = z.object({
   description: z.string().optional(),
   unit: z.string().min(2, translations.validation.required),
   modality: z.enum(["onsite", "hybrid", "remote"]),
+  tipoPosto: z.string().optional(),
+  horarioTrabalho: z.string().optional(),
+  escalaRegime: z.string().optional(),
+  quantidadePrevista: z.coerce.number().int().min(0).optional().nullable(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -48,6 +52,10 @@ export default function ServicePostForm({ postId }: ServicePostFormProps) {
       description: "",
       unit: "",
       modality: "onsite",
+      tipoPosto: "",
+      horarioTrabalho: "",
+      escalaRegime: "",
+      quantidadePrevista: null,
     },
   });
 
@@ -59,6 +67,10 @@ export default function ServicePostForm({ postId }: ServicePostFormProps) {
         description: servicePost.description || "",
         unit: servicePost.unit,
         modality: servicePost.modality,
+        tipoPosto: servicePost.tipoPosto || "",
+        horarioTrabalho: servicePost.horarioTrabalho || "",
+        escalaRegime: servicePost.escalaRegime || "",
+        quantidadePrevista: servicePost.quantidadePrevista ?? null,
       });
     }
   }, [servicePost, form]);
@@ -197,6 +209,85 @@ export default function ServicePostForm({ postId }: ServicePostFormProps) {
                           rows={4}
                           {...field}
                           data-testid="input-post-description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="tipoPosto"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{translations.servicePosts.tipoPosto}</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Ex: Administrativo, Operacional" 
+                          {...field} 
+                          value={field.value || ""} 
+                          data-testid="input-tipo-posto" 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="horarioTrabalho"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{translations.servicePosts.horarioTrabalho}</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Ex: 08:00 - 17:00" 
+                          {...field} 
+                          value={field.value || ""} 
+                          data-testid="input-horario-trabalho" 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="escalaRegime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{translations.servicePosts.escalaRegime}</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Ex: 5x2, 12x36" 
+                          {...field} 
+                          value={field.value || ""} 
+                          data-testid="input-escala-regime" 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="quantidadePrevista"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{translations.servicePosts.quantidadePrevista}</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          placeholder="Ex: 5" 
+                          {...field} 
+                          value={field.value ?? ""} 
+                          onChange={(e) => field.onChange(e.target.value === "" ? null : parseInt(e.target.value, 10))}
+                          data-testid="input-quantidade-prevista" 
                         />
                       </FormControl>
                       <FormMessage />
