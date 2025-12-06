@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, Pencil, FileText, Calendar } from "lucide-react";
+import { ArrowLeft, Pencil, FileText, Calendar, Palmtree } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -32,6 +32,9 @@ export default function EmployeeView({ employeeId }: EmployeeViewProps) {
 
   const employeeDocuments = documents?.filter(d => d.employeeId === employeeId) || [];
   const employeeAllocations = allocations?.filter(a => a.employeeId === employeeId).slice(0, 10) || [];
+  const employeeLeaves = allocations?.filter(a => 
+    a.employeeId === employeeId && (a.status === "vacation" || a.status === "medical_leave")
+  ).slice(0, 10) || [];
 
   if (isLoading) {
     return (
@@ -171,6 +174,35 @@ export default function EmployeeView({ employeeId }: EmployeeViewProps) {
                     <p className="text-xs text-muted-foreground">{translations.servicePosts.title}: {allocation.postId}</p>
                   </div>
                   <StatusBadge status={allocation.status} />
+                </div>
+              ))}
+            </div>
+          )}
+          <Button variant="outline" size="sm" className="mt-4" asChild>
+            <Link href="/allocation">{translations.common.view} {translations.allocation.title}</Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palmtree className="h-5 w-5" />
+            Férias e Licenças
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {employeeLeaves.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum registro de férias ou licença encontrado.</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {employeeLeaves.map((leave) => (
+                <div key={leave.id} className="flex items-center justify-between rounded-md border p-3" data-testid={`leave-card-${leave.id}`}>
+                  <div>
+                    <p className="text-sm font-medium">{formatDate(leave.date)}</p>
+                    <p className="text-xs text-muted-foreground">{translations.servicePosts.title}: {leave.postId}</p>
+                  </div>
+                  <StatusBadge status={leave.status} />
                 </div>
               ))}
             </div>

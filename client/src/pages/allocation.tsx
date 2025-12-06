@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Save, Upload, Copy, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, Upload, Copy, Download, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -36,6 +36,9 @@ export default function AllocationPage() {
   const [editedAllocations, setEditedAllocations] = useState<Map<string, string>>(new Map());
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [bulkFillDialogOpen, setBulkFillDialogOpen] = useState(false);
+  const [bulkFillDay, setBulkFillDay] = useState<string>("");
+  const [bulkFillStatus, setBulkFillStatus] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: employees, isLoading: employeesLoading } = useQuery<Employee[]>({
@@ -216,6 +219,30 @@ export default function AllocationPage() {
     setEditedAllocations(prev => new Map(prev).set(key, status));
   };
 
+  const handleBulkFill = () => {
+    if (!bulkFillDay || !bulkFillStatus) {
+      toast({ 
+        title: translations.common.error, 
+        description: "Selecione o dia e o status para preencher", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    const newAllocations = new Map(editedAllocations);
+    activeEmployees.forEach((employee) => {
+      const key = `${employee.id}_${bulkFillDay}`;
+      newAllocations.set(key, bulkFillStatus);
+    });
+    setEditedAllocations(newAllocations);
+    toast({ 
+      title: "Alterações pendentes", 
+      description: `Status "${statusLabels[bulkFillStatus]}" aplicado para ${activeEmployees.length} funcionários. Clique em "Salvar Alterações" para confirmar.` 
+    });
+    setBulkFillDialogOpen(false);
+    setBulkFillDay("");
+    setBulkFillStatus("");
+  };
+
   const previousMonth = () => {
     setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
@@ -327,6 +354,71 @@ export default function AllocationPage() {
                       data-testid="button-confirm-copy"
                     >
                       {copyMonthMutation.isPending ? "Copiando..." : "Copiar Alocações"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={bulkFillDialogOpen} onOpenChange={setBulkFillDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" data-testid="button-bulk-fill">
+                    <Wand2 className="h-4 w-4 mr-2" />
+                    Preencher Dia
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Preencher Status do Dia</DialogTitle>
+                    <DialogDescription>
+                      Selecione um dia e um status para aplicar a todos os funcionários ativos de uma só vez.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="bulk-day">Dia</Label>
+                      <Select value={bulkFillDay} onValueChange={setBulkFillDay}>
+                        <SelectTrigger data-testid="select-bulk-day">
+                          <SelectValue placeholder="Selecione o dia" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {daysInMonth.map((day) => (
+                            <SelectItem key={day.toISOString()} value={format(day, "yyyy-MM-dd")}>
+                              {format(day, "dd/MM/yyyy (EEEE)", { locale: ptBR })}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bulk-status">Status</Label>
+                      <Select value={bulkFillStatus} onValueChange={setBulkFillStatus}>
+                        <SelectTrigger data-testid="select-bulk-status">
+                          <SelectValue placeholder="Selecione o status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allocationStatuses.map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {statusLabels[s] || s}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setBulkFillDialogOpen(false)}
+                      data-testid="button-cancel-bulk"
+                    >
+                      {translations.common.cancel}
+                    </Button>
+                    <Button
+                      onClick={handleBulkFill}
+                      disabled={!bulkFillDay || !bulkFillStatus}
+                      data-testid="button-confirm-bulk"
+                    >
+                      Aplicar para Todos
                     </Button>
                   </DialogFooter>
                 </DialogContent>

@@ -74,6 +74,8 @@ export const employees = pgTable("employees", {
   functionPost: varchar("function_post", { length: 255 }).notNull(),
   unit: varchar("unit", { length: 255 }).notNull(),
   status: employeeStatusEnum("status").default("active").notNull(),
+  admissionDate: date("admission_date"),
+  linkedPostId: integer("linked_post_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -111,6 +113,7 @@ export const occurrences = pgTable("occurrences", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   date: date("date").notNull(),
   employeeId: integer("employee_id").references(() => employees.id, { onDelete: "set null" }),
+  postId: integer("post_id").references(() => servicePosts.id, { onDelete: "set null" }),
   description: text("description").notNull(),
   category: occurrenceCategoryEnum("category").notNull(),
   treated: boolean("treated").default(false).notNull(),
@@ -237,7 +240,11 @@ export const notificationSettingsRelations = relations(notificationSettings, ({ 
   }),
 }));
 
-export const employeesRelations = relations(employees, ({ many }) => ({
+export const employeesRelations = relations(employees, ({ one, many }) => ({
+  linkedPost: one(servicePosts, {
+    fields: [employees.linkedPostId],
+    references: [servicePosts.id],
+  }),
   allocations: many(allocations),
   occurrences: many(occurrences),
   documents: many(documents),
@@ -272,6 +279,10 @@ export const occurrencesRelations = relations(occurrences, ({ one }) => ({
   employee: one(employees, {
     fields: [occurrences.employeeId],
     references: [employees.id],
+  }),
+  post: one(servicePosts, {
+    fields: [occurrences.postId],
+    references: [servicePosts.id],
   }),
   treatedByUser: one(users, {
     fields: [occurrences.treatedBy],
@@ -425,6 +436,10 @@ export type InsertLgpdLog = z.infer<typeof insertLgpdLogSchema>;
 export type LgpdLog = typeof lgpdLogs.$inferSelect;
 
 // Extended types with relations
+export type EmployeeWithRelations = Employee & {
+  linkedPost?: ServicePost | null;
+};
+
 export type AllocationWithRelations = Allocation & {
   employee?: Employee;
   post?: ServicePost;
@@ -432,6 +447,7 @@ export type AllocationWithRelations = Allocation & {
 
 export type OccurrenceWithRelations = Occurrence & {
   employee?: Employee | null;
+  post?: ServicePost | null;
   treatedByUser?: User | null;
 };
 

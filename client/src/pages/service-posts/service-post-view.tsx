@@ -1,15 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, Pencil, Users, FileText } from "lucide-react";
+import { ArrowLeft, Pencil, Users, FileText, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDate } from "@/lib/authUtils";
 import { translations } from "@/lib/translations";
-import type { ServicePost, Allocation, Document } from "@shared/schema";
+import type { ServicePost, Allocation, Document, Employee } from "@shared/schema";
 
 interface ServicePostViewProps {
   postId: number;
@@ -30,8 +31,13 @@ export default function ServicePostView({ postId }: ServicePostViewProps) {
     queryKey: ["/api/allocations"],
   });
 
+  const { data: employees } = useQuery<Employee[]>({
+    queryKey: ["/api/employees"],
+  });
+
   const postDocuments = documents?.filter(d => d.postId === postId) || [];
   const postAllocations = allocations?.filter(a => a.postId === postId).slice(0, 10) || [];
+  const linkedEmployees = employees?.filter(e => e.linkedPostId === postId) || [];
 
   if (isLoading) {
     return (
@@ -175,6 +181,46 @@ export default function ServicePostView({ postId }: ServicePostViewProps) {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Funcionários Vinculados
+            <Badge variant="secondary" className="ml-2">{linkedEmployees.length}</Badge>
+          </CardTitle>
+          {isAdmin && (
+            <Button size="sm" asChild data-testid="button-add-employee">
+              <Link href={`/employees/new?linkedPostId=${postId}`}>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Adicionar Funcionário
+              </Link>
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent>
+          {linkedEmployees.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum funcionário vinculado a este posto</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {linkedEmployees.map((employee) => (
+                <Link key={employee.id} href={`/employees/${employee.id}`}>
+                  <div 
+                    className="flex items-center justify-between rounded-md border p-3 hover-elevate cursor-pointer"
+                    data-testid={`card-employee-${employee.id}`}
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{employee.name}</p>
+                      <p className="text-xs text-muted-foreground">{employee.functionPost}</p>
+                    </div>
+                    <StatusBadge status={employee.status} />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

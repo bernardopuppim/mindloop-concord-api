@@ -15,7 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDate } from "@/lib/authUtils";
 import { translations } from "@/lib/translations";
-import type { Occurrence, Employee } from "@shared/schema";
+import type { Occurrence, Employee, ServicePost } from "@shared/schema";
 
 export default function OccurrencesPage() {
   const { isAdmin } = useAuth();
@@ -33,6 +33,10 @@ export default function OccurrencesPage() {
 
   const { data: employees } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
+  });
+
+  const { data: servicePosts } = useQuery<ServicePost[]>({
+    queryKey: ["/api/service-posts"],
   });
 
   const employeeMap = new Map(employees?.map(e => [e.id, e]) || []);
@@ -236,6 +240,7 @@ export default function OccurrencesPage() {
         onOpenChange={setIsDialogOpen}
         occurrence={editingOccurrence}
         employees={employees || []}
+        servicePosts={servicePosts || []}
       />
 
       <ConfirmDialog

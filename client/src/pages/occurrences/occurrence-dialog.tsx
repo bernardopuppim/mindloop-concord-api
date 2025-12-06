@@ -12,11 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { translations } from "@/lib/translations";
-import type { Occurrence, Employee } from "@shared/schema";
+import type { Occurrence, Employee, ServicePost } from "@shared/schema";
 
 const formSchema = z.object({
   date: z.string().min(1, translations.validation.required),
   employeeId: z.string().optional(),
+  postId: z.string().optional(),
   category: z.enum(["absence", "substitution", "issue", "note"]),
   description: z.string().min(5, translations.validation.descriptionMinLength.replace("{min}", "5")),
 });
@@ -28,9 +29,10 @@ interface OccurrenceDialogProps {
   onOpenChange: (open: boolean) => void;
   occurrence: Occurrence | null;
   employees: Employee[];
+  servicePosts: ServicePost[];
 }
 
-export function OccurrenceDialog({ open, onOpenChange, occurrence, employees }: OccurrenceDialogProps) {
+export function OccurrenceDialog({ open, onOpenChange, occurrence, employees, servicePosts }: OccurrenceDialogProps) {
   const { toast } = useToast();
   const isEditing = !!occurrence;
 
@@ -39,6 +41,7 @@ export function OccurrenceDialog({ open, onOpenChange, occurrence, employees }: 
     defaultValues: {
       date: new Date().toISOString().split("T")[0],
       employeeId: "",
+      postId: "",
       category: "note",
       description: "",
     },
@@ -49,6 +52,7 @@ export function OccurrenceDialog({ open, onOpenChange, occurrence, employees }: 
       form.reset({
         date: occurrence.date,
         employeeId: occurrence.employeeId?.toString() || "",
+        postId: occurrence.postId?.toString() || "",
         category: occurrence.category,
         description: occurrence.description,
       });
@@ -56,6 +60,7 @@ export function OccurrenceDialog({ open, onOpenChange, occurrence, employees }: 
       form.reset({
         date: new Date().toISOString().split("T")[0],
         employeeId: "",
+        postId: "",
         category: "note",
         description: "",
       });
@@ -66,7 +71,8 @@ export function OccurrenceDialog({ open, onOpenChange, occurrence, employees }: 
     mutationFn: async (data: FormData) => {
       const payload = {
         ...data,
-        employeeId: data.employeeId ? parseInt(data.employeeId) : null,
+        employeeId: data.employeeId && data.employeeId !== "none" ? parseInt(data.employeeId) : null,
+        postId: data.postId && data.postId !== "none" ? parseInt(data.postId) : null,
       };
       if (isEditing) {
         await apiRequest("PATCH", `/api/occurrences/${occurrence.id}`, payload);
@@ -143,17 +149,43 @@ export function OccurrenceDialog({ open, onOpenChange, occurrence, employees }: 
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>{translations.occurrences.employee} ({translations.common.optional})</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || "none"}>
                     <FormControl>
                       <SelectTrigger data-testid="select-occurrence-employee">
                         <SelectValue placeholder={`${translations.allocation.selectEmployee} (${translations.common.optional})`} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Nenhum</SelectItem>
+                      <SelectItem value="none">Nenhum</SelectItem>
                       {employees.map((employee) => (
                         <SelectItem key={employee.id} value={employee.id.toString()}>
                           {employee.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="postId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Posto de Serviço ({translations.common.optional})</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || "none"}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-occurrence-post">
+                        <SelectValue placeholder={`${translations.allocation.selectPost} (${translations.common.optional})`} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {servicePosts.map((post) => (
+                        <SelectItem key={post.id} value={post.id.toString()}>
+                          {post.postCode} - {post.postName}
                         </SelectItem>
                       ))}
                     </SelectContent>
