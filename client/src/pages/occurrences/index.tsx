@@ -156,59 +156,60 @@ export default function OccurrencesPage() {
       <PageHeader
         title={translations.occurrences.title}
         description={translations.occurrences.pageDescription}
-      >
-        {isAdmin && (
-          <Button
-            onClick={() => {
-              setEditingOccurrence(null);
-              setIsDialogOpen(true);
-            }}
-            data-testid="button-add-occurrence"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            {translations.occurrences.addOccurrence}
-          </Button>
-        )}
-      </PageHeader>
+      />
 
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder={translations.occurrences.searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-              data-testid="input-search-occurrences"
-            />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center flex-1">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder={translations.occurrences.searchPlaceholder}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-occurrences"
+              />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-[160px]" data-testid="select-category-filter">
+                  <SelectValue placeholder={translations.occurrences.category} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{translations.occurrences.allCategories}</SelectItem>
+                  <SelectItem value="absence">{translations.occurrences.absence}</SelectItem>
+                  <SelectItem value="substitution">{translations.occurrences.substitution}</SelectItem>
+                  <SelectItem value="issue">{translations.occurrences.issue}</SelectItem>
+                  <SelectItem value="note">{translations.occurrences.note}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
+                <SelectTrigger className="w-[180px]" data-testid="select-employee-filter">
+                  <SelectValue placeholder={translations.occurrences.employee} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{translations.occurrences.allEmployees}</SelectItem>
+                  {employees?.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id.toString()}>{emp.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[160px]" data-testid="select-category-filter">
-                <SelectValue placeholder={translations.occurrences.category} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{translations.occurrences.allCategories}</SelectItem>
-                <SelectItem value="absence">{translations.occurrences.absence}</SelectItem>
-                <SelectItem value="substitution">{translations.occurrences.substitution}</SelectItem>
-                <SelectItem value="issue">{translations.occurrences.issue}</SelectItem>
-                <SelectItem value="note">{translations.occurrences.note}</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
-              <SelectTrigger className="w-[180px]" data-testid="select-employee-filter">
-                <SelectValue placeholder={translations.occurrences.employee} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{translations.occurrences.allEmployees}</SelectItem>
-                {employees?.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id.toString()}>{emp.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {isAdmin && (
+            <Button
+              onClick={() => {
+                setEditingOccurrence(null);
+                setIsDialogOpen(true);
+              }}
+              data-testid="button-new-occurrence"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Ocorrência
+            </Button>
+          )}
         </div>
         {activeFilters.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">

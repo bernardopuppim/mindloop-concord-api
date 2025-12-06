@@ -101,7 +101,9 @@ export function OccurrenceDialog({ open, onOpenChange, occurrence, employees, se
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEditing ? translations.occurrences.editOccurrence : translations.occurrences.addOccurrence}</DialogTitle>
+          <DialogTitle data-testid="dialog-occurrence-title">
+            {isEditing ? translations.occurrences.editOccurrence : translations.occurrences.addOccurrence}
+          </DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
