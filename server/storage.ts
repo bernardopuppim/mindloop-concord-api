@@ -67,7 +67,10 @@ export interface IStorage {
   getDocuments(filters?: { documentType?: string; employeeId?: number; postId?: number; monthYear?: string }): Promise<DocumentWithRelations[]>;
   getDocument(id: number): Promise<DocumentWithRelations | undefined>;
   createDocument(document: InsertDocument): Promise<Document>;
+  updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document | undefined>;
   deleteDocument(id: number): Promise<boolean>;
+  getExpiringDocuments(daysAhead?: number): Promise<DocumentWithRelations[]>;
+  getExpiredDocuments(): Promise<DocumentWithRelations[]>;
 
   getAuditLogs(limit?: number): Promise<AuditLogWithRelations[]>;
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
@@ -403,6 +406,55 @@ export class DatabaseStorage implements IStorage {
   async deleteDocument(id: number): Promise<boolean> {
     const result = await db.delete(documents).where(eq(documents.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  async updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document | undefined> {
+    const [updated] = await db
+      .update(documents)
+      .set(document)
+      .where(eq(documents.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getExpiringDocuments(daysAhead: number = 30): Promise<DocumentWithRelations[]> {
+    const today = new Date().toISOString().split('T')[0];
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + daysAhead);
+    const futureDateStr = futureDate.toISOString().split('T')[0];
+
+    const result = await db.query.documents.findMany({
+      where: and(
+        sql`${documents.expirationDate} IS NOT NULL`,
+        gte(documents.expirationDate, today),
+        lte(documents.expirationDate, futureDateStr)
+      ),
+      with: {
+        employee: true,
+        post: true,
+        uploader: true,
+      },
+      orderBy: [documents.expirationDate],
+    });
+    return result;
+  }
+
+  async getExpiredDocuments(): Promise<DocumentWithRelations[]> {
+    const today = new Date().toISOString().split('T')[0];
+
+    const result = await db.query.documents.findMany({
+      where: and(
+        sql`${documents.expirationDate} IS NOT NULL`,
+        lte(documents.expirationDate, today)
+      ),
+      with: {
+        employee: true,
+        post: true,
+        uploader: true,
+      },
+      orderBy: [desc(documents.expirationDate)],
+    });
+    return result;
   }
 
   async getAuditLogs(limit: number = 100): Promise<AuditLogWithRelations[]> {

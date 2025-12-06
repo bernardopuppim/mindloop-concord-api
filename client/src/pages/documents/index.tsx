@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Download, Trash2, Search, Filter, FileText, Image, File, Eye, X } from "lucide-react";
+import { Plus, Download, Trash2, Search, Filter, FileText, Image, File, Eye, X, AlertTriangle, Clock, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { DocTypeBadge } from "@/components/status-badge";
@@ -24,6 +25,53 @@ function getFileIcon(mimeType: string) {
   return File;
 }
 
+function getExpirationStatus(expirationDate: string | null): { status: "expired" | "expiring" | "valid" | "none"; daysLeft: number | null } {
+  if (!expirationDate) return { status: "none", daysLeft: null };
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expDate = new Date(expirationDate);
+  expDate.setHours(0, 0, 0, 0);
+  
+  const diffTime = expDate.getTime() - today.getTime();
+  const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (daysLeft < 0) return { status: "expired", daysLeft };
+  if (daysLeft <= 30) return { status: "expiring", daysLeft };
+  return { status: "valid", daysLeft };
+}
+
+function ExpirationBadge({ expirationDate }: { expirationDate: string | null }) {
+  const { status, daysLeft } = getExpirationStatus(expirationDate);
+  
+  if (status === "none") return null;
+  
+  if (status === "expired") {
+    return (
+      <Badge variant="destructive" className="text-xs gap-1">
+        <AlertTriangle className="h-3 w-3" />
+        Expired
+      </Badge>
+    );
+  }
+  
+  if (status === "expiring") {
+    return (
+      <Badge variant="outline" className="text-xs gap-1 border-yellow-500 text-yellow-600 dark:text-yellow-400">
+        <Clock className="h-3 w-3" />
+        {daysLeft === 0 ? "Today" : `${daysLeft}d left`}
+      </Badge>
+    );
+  }
+  
+  return (
+    <span className="text-xs text-muted-foreground flex items-center gap-1">
+      <Calendar className="h-3 w-3" />
+      {formatDate(expirationDate)}
+    </span>
+  );
+}
+
 export default function DocumentsPage() {
   const { isAdmin } = useAuth();
   const { toast } = useToast();
@@ -34,6 +82,7 @@ export default function DocumentsPage() {
   const [postFilter, setPostFilter] = useState<string>("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("all");
 
   const params = new URLSearchParams(location.split("?")[1] || "");
   const employeeIdParam = params.get("employeeId");
@@ -41,6 +90,14 @@ export default function DocumentsPage() {
 
   const { data: documents, isLoading } = useQuery<Document[]>({
     queryKey: ["/api/documents"],
+  });
+
+  const { data: expiringDocuments, isLoading: isLoadingExpiring } = useQuery<Document[]>({
+    queryKey: ["/api/documents/expiring"],
+  });
+
+  const { data: expiredDocuments, isLoading: isLoadingExpired } = useQuery<Document[]>({
+    queryKey: ["/api/documents/expired"],
   });
 
   const { data: employees } = useQuery<Employee[]>({
@@ -60,6 +117,8 @@ export default function DocumentsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents/expiring"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents/expired"] });
       toast({ title: "Success", description: "Document deleted successfully" });
       setDeleteId(null);
     },
@@ -139,6 +198,11 @@ export default function DocumentsPage() {
       ),
     },
     {
+      key: "expiration",
+      header: "Expiration",
+      cell: (doc: Document) => <ExpirationBadge expirationDate={(doc as any).expirationDate} />,
+    },
+    {
       key: "date",
       header: "Uploaded",
       cell: (doc: Document) => (
@@ -178,6 +242,31 @@ export default function DocumentsPage() {
     },
   ];
 
+  const expiringCount = expiringDocuments?.length || 0;
+  const expiredCount = expiredDocuments?.length || 0;
+
+  const getTabData = () => {
+    switch (activeTab) {
+      case "expiring":
+        return expiringDocuments || [];
+      case "expired":
+        return expiredDocuments || [];
+      default:
+        return filteredDocuments;
+    }
+  };
+
+  const getTabLoading = () => {
+    switch (activeTab) {
+      case "expiring":
+        return isLoadingExpiring;
+      case "expired":
+        return isLoadingExpired;
+      default:
+        return isLoading;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -192,81 +281,158 @@ export default function DocumentsPage() {
         )}
       </PageHeader>
 
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by filename..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-              data-testid="input-search-documents"
-            />
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[150px]" data-testid="select-type-filter">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="aso">ASO</SelectItem>
-                <SelectItem value="certification">Certification</SelectItem>
-                <SelectItem value="evidence">Evidence</SelectItem>
-                <SelectItem value="contract">Contract</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
-              <SelectTrigger className="w-[180px]" data-testid="select-employee-filter">
-                <SelectValue placeholder="Employee" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Employees</SelectItem>
-                {employees?.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id.toString()}>{emp.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={postFilter} onValueChange={setPostFilter}>
-              <SelectTrigger className="w-[180px]" data-testid="select-post-filter">
-                <SelectValue placeholder="Service Post" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Posts</SelectItem>
-                {servicePosts?.map((post) => (
-                  <SelectItem key={post.id} value={post.id.toString()}>{post.postCode} - {post.postName}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      {(expiredCount > 0 || expiringCount > 0) && (
+        <div className="flex flex-col sm:flex-row gap-4">
+          {expiredCount > 0 && (
+            <Card className="flex-1 border-destructive/50">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Expired Documents</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-expired-count">{expiredCount}</div>
+                <p className="text-xs text-muted-foreground">
+                  Documents requiring immediate attention
+                </p>
+                <Button 
+                  variant="link" 
+                  className="p-0 h-auto text-xs mt-1" 
+                  onClick={() => setActiveTab("expired")}
+                  data-testid="button-view-expired"
+                >
+                  View expired documents
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+          {expiringCount > 0 && (
+            <Card className="flex-1 border-yellow-500/50">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
+                <Clock className="h-4 w-4 text-yellow-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-expiring-count">{expiringCount}</div>
+                <p className="text-xs text-muted-foreground">
+                  Documents expiring within 30 days
+                </p>
+                <Button 
+                  variant="link" 
+                  className="p-0 h-auto text-xs mt-1" 
+                  onClick={() => setActiveTab("expiring")}
+                  data-testid="button-view-expiring"
+                >
+                  View expiring documents
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
-        {activeFilters.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-muted-foreground">Active filters:</span>
-            {activeFilters.map((filter) => (
-              <Badge key={filter} variant="secondary" className="text-xs">
-                {filter}
-              </Badge>
-            ))}
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 px-2" data-testid="button-clear-filters">
-              <X className="h-3 w-3 mr-1" />
-              Clear all
-            </Button>
-          </div>
-        )}
-      </div>
+      )}
 
-      <DataTable
-        columns={columns}
-        data={filteredDocuments}
-        isLoading={isLoading}
-        emptyMessage="No documents found"
-        emptyDescription="Upload documents to store evidence and certifications."
-        testIdPrefix="documents"
-      />
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList data-testid="tabs-document-status">
+          <TabsTrigger value="all" data-testid="tab-all-documents">
+            All Documents
+          </TabsTrigger>
+          <TabsTrigger value="expiring" data-testid="tab-expiring-documents">
+            Expiring Soon
+            {expiringCount > 0 && (
+              <Badge variant="outline" className="ml-2 text-xs border-yellow-500 text-yellow-600 dark:text-yellow-400">
+                {expiringCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="expired" data-testid="tab-expired-documents">
+            Expired
+            {expiredCount > 0 && (
+              <Badge variant="destructive" className="ml-2 text-xs">
+                {expiredCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={activeTab} className="mt-4">
+          {activeTab === "all" && (
+            <div className="flex flex-col gap-4 mb-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by filename..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-search-documents"
+                  />
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger className="w-[150px]" data-testid="select-type-filter">
+                      <SelectValue placeholder="Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="aso">ASO</SelectItem>
+                      <SelectItem value="certification">Certification</SelectItem>
+                      <SelectItem value="evidence">Evidence</SelectItem>
+                      <SelectItem value="contract">Contract</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-employee-filter">
+                      <SelectValue placeholder="Employee" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Employees</SelectItem>
+                      {employees?.map((emp) => (
+                        <SelectItem key={emp.id} value={emp.id.toString()}>{emp.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={postFilter} onValueChange={setPostFilter}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-post-filter">
+                      <SelectValue placeholder="Service Post" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Posts</SelectItem>
+                      {servicePosts?.map((post) => (
+                        <SelectItem key={post.id} value={post.id.toString()}>{post.postCode} - {post.postName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {activeFilters.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-muted-foreground">Active filters:</span>
+                  {activeFilters.map((filter) => (
+                    <Badge key={filter} variant="secondary" className="text-xs">
+                      {filter}
+                    </Badge>
+                  ))}
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 px-2" data-testid="button-clear-filters">
+                    <X className="h-3 w-3 mr-1" />
+                    Clear all
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DataTable
+            columns={columns}
+            data={getTabData()}
+            isLoading={getTabLoading()}
+            emptyMessage={activeTab === "all" ? "No documents found" : activeTab === "expiring" ? "No documents expiring soon" : "No expired documents"}
+            emptyDescription={activeTab === "all" ? "Upload documents to store evidence and certifications." : activeTab === "expiring" ? "All documents are up to date." : "No documents have expired."}
+            testIdPrefix="documents"
+          />
+        </TabsContent>
+      </Tabs>
 
       <DocumentUploadDialog
         open={isUploadOpen}

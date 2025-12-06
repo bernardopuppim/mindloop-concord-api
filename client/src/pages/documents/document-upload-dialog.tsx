@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Upload, X, FileText } from "lucide-react";
+import { Upload, X, FileText, Calendar } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -25,6 +26,7 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
   const [linkType, setLinkType] = useState<string>("none");
   const [linkedId, setLinkedId] = useState<string>("");
   const [monthYear, setMonthYear] = useState<string>("");
+  const [expirationDate, setExpirationDate] = useState<string>("");
 
   const monthYearOptions = getMonthYearOptions();
 
@@ -44,6 +46,10 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
         formData.append("monthYear", monthYear);
       }
 
+      if (expirationDate) {
+        formData.append("expirationDate", expirationDate);
+      }
+
       const response = await fetch("/api/documents/upload", {
         method: "POST",
         body: formData,
@@ -59,6 +65,8 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents/expiring"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents/expired"] });
       toast({ title: "Success", description: "Document uploaded successfully" });
       handleClose();
     },
@@ -88,6 +96,7 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
     setLinkType("none");
     setLinkedId("");
     setMonthYear("");
+    setExpirationDate("");
     onOpenChange(false);
   };
 
@@ -238,6 +247,23 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
               </Select>
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label>Expiration Date (Optional)</Label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="date"
+                value={expirationDate}
+                onChange={(e) => setExpirationDate(e.target.value)}
+                className="pl-9"
+                data-testid="input-expiration-date"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Set an expiration date to track document renewals
+            </p>
+          </div>
         </div>
 
         <DialogFooter>

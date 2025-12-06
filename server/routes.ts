@@ -635,6 +635,27 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/documents/expiring", isAuthenticated, async (req, res) => {
+    try {
+      const daysAhead = req.query.days ? parseInt(req.query.days as string) : 30;
+      const expiringDocs = await storage.getExpiringDocuments(daysAhead);
+      res.json(expiringDocs);
+    } catch (error) {
+      console.error("Error fetching expiring documents:", error);
+      res.status(500).json({ message: "Failed to fetch expiring documents" });
+    }
+  });
+
+  app.get("/api/documents/expired", isAuthenticated, async (_req, res) => {
+    try {
+      const expiredDocs = await storage.getExpiredDocuments();
+      res.json(expiredDocs);
+    } catch (error) {
+      console.error("Error fetching expired documents:", error);
+      res.status(500).json({ message: "Failed to fetch expired documents" });
+    }
+  });
+
   app.get("/api/documents/:id", isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -660,7 +681,7 @@ export async function registerRoutes(
           return res.status(400).json({ message: "No file uploaded" });
         }
 
-        const { documentType, employeeId, postId, monthYear } = req.body;
+        const { documentType, employeeId, postId, monthYear, expirationDate } = req.body;
 
         const document = await storage.createDocument({
           filename: req.file.filename,
@@ -672,6 +693,7 @@ export async function registerRoutes(
           employeeId: employeeId ? parseInt(employeeId) : null,
           postId: postId ? parseInt(postId) : null,
           monthYear: monthYear || null,
+          expirationDate: expirationDate || null,
           uploadedBy: req.user?.claims?.sub || null,
         });
 
@@ -723,6 +745,23 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting document:", error);
       res.status(500).json({ message: "Failed to delete document" });
+    }
+  });
+
+  app.patch("/api/documents/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { expirationDate } = req.body;
+      
+      const document = await storage.updateDocument(id, { expirationDate: expirationDate || null });
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      await logAction(req.user?.claims?.sub, "update", "document", id, { expirationDate });
+      res.json(document);
+    } catch (error) {
+      console.error("Error updating document:", error);
+      res.status(500).json({ message: "Failed to update document" });
     }
   });
 

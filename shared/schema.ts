@@ -104,6 +104,7 @@ export const documents = pgTable("documents", {
   employeeId: integer("employee_id").references(() => employees.id, { onDelete: "set null" }),
   postId: integer("post_id").references(() => servicePosts.id, { onDelete: "set null" }),
   monthYear: varchar("month_year", { length: 7 }),
+  expirationDate: date("expiration_date"),
   uploadedBy: varchar("uploaded_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
 });
