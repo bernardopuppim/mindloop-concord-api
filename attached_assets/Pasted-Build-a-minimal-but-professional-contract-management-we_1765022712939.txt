@@ -1,0 +1,200 @@
+Build a minimal but professional contract management web application with the following features.
+Use Next.js (App Router), TailwindCSS, SQLite database, and API routes under /app/api.
+Follow clean architecture and generate a clear folder structure.
+The system must include:
+
+🔐 1. Authentication + RBAC
+
+Simple email + password authentication.
+
+Two roles: admin and viewer.
+
+Admin can create/edit/delete data.
+
+Viewer (Petrobras) can only view data and export reports.
+
+Store users in SQLite table users.
+
+Middleware to protect routes.
+
+👤 2. Employee Registry (CRUD)
+
+Create pages for:
+
+List employees
+
+Add employee
+
+Edit employee
+
+View employee
+Fields:
+
+name
+
+cpf
+
+function/post
+
+unit
+
+status (active/inactive)
+
+documents (ASO, certifications) → link to upload module
+Backend table: employees.
+
+🗂️ 3. Service Post Registry (CRUD)
+
+Represents the posts of service (from Petrobras Annex 1A).
+Fields:
+
+post_code
+
+post_name
+
+description
+
+unit
+
+modality (onsite, hybrid, remote)
+Backend table: service_posts.
+
+📅 4. Daily Allocation Tracking
+
+Admin can record daily allocation of employees.
+For each day:
+
+employee_id
+
+post_id
+
+date
+
+status (present, absent, justified, etc.)
+Viewer can generate a monthly report.
+Backend table: allocations.
+Create UI similar to a simple attendance sheet.
+
+📄 5. Occurrence / Incident Registry (CRUD)
+
+Simple form with:
+
+date
+
+employee_id (optional)
+
+description
+
+category (absence, substitution, issue, note)
+Backend table: occurrences.
+
+📁 6. Document Upload Module (PDF / images)
+
+For evidence of contractual obligations.
+Admins can upload files linked to:
+
+employee_id, or
+
+post_id, or
+
+monthly evidence group
+Backend table: documents.
+Store metadata + local file storage.
+List + preview + download.
+
+📊 7. Reports
+
+Generate:
+
+Monthly allocation report (CSV + HTML table).
+
+Occurrence list filtered by period.
+
+Document list per employee/post.
+Viewer role can ONLY view and export.
+Admin can edit data.
+
+📝 8. Audit Log
+
+Record in table audit_logs:
+
+user_id
+
+action
+
+entity_type
+
+entity_id
+
+timestamp
+
+Log all CREATE, UPDATE, DELETE operations.
+
+🎨 9. UI/UX Requirements
+
+Use TailwindCSS.
+
+Clean layout with sidebar navigation:
+
+Dashboard
+
+Employees
+
+Service Posts
+
+Allocation
+
+Occurrences
+
+Documents
+
+Reports
+
+Admin Settings
+
+Mobile-friendly.
+
+Simple and professional look.
+
+🗂️ 10. Folder Structure
+app/
+  layout.tsx
+  dashboard/page.tsx
+  employees/
+      page.tsx
+      new/page.tsx
+      [id]/page.tsx
+  service-posts/
+      ...
+  allocation/
+  occurrences/
+  documents/
+  reports/
+  admin/
+api/
+  employees/
+  service-posts/
+  allocation/
+  occurrences/
+  documents/
+  auth/
+lib/
+  db.ts   (SQLite connection)
+  auth.ts
+  utils.ts
+public/uploads/
+
+📦 11. Backend Requirements
+
+SQLite using better-sqlite3 or Prisma (preferred).
+
+Create migration for all tables.
+
+API routes for all CRUD operations.
+
+Validation of inputs.
+
+🎯 12. Goals
+
+Deliver a fully functional MVP of a “Solução Tecnológica Petrobras – Gestão e Fiscalização Contratual”, meeting requirements of clauses 9.3.1 to 9.3.5 with minimal complexity.
+Public URL must be accessible for demonstration.
