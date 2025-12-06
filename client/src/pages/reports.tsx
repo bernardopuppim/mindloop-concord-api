@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Download, FileSpreadsheet, Calendar, AlertCircle, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusBadge, CategoryBadge } from "@/components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getMonthYearOptions, formatDate } from "@/lib/authUtils";
+import { translations } from "@/lib/translations";
 import type { Allocation, Occurrence, Document, Employee, ServicePost } from "@shared/schema";
 
 export default function ReportsPage() {
@@ -41,7 +43,7 @@ export default function ReportsPage() {
   }) || [];
 
   const downloadAllocationCSV = () => {
-    const headers = ["Date", "Employee", "Service Post", "Status", "Notes"];
+    const headers = ["Data", "Funcionário", "Posto de Serviço", "Status", "Observações"];
     const rows = filteredAllocations.map(a => [
       a.date,
       employeeMap.get(a.employeeId)?.name || "",
@@ -55,13 +57,13 @@ export default function ReportsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `allocations-${selectedMonth}.csv`;
+    a.download = `alocacoes-${selectedMonth}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const downloadOccurrenceCSV = () => {
-    const headers = ["Date", "Category", "Employee", "Description"];
+    const headers = ["Data", "Categoria", "Funcionário", "Descrição"];
     const rows = filteredOccurrences.map(o => [
       o.date,
       o.category,
@@ -74,7 +76,7 @@ export default function ReportsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `occurrences-${selectedMonth}.csv`;
+    a.download = `ocorrencias-${selectedMonth}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -82,15 +84,15 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Reports"
-        description="Generate and export reports for allocations, occurrences, and documents"
+        title={translations.reports.title}
+        description={translations.reports.description}
       />
 
       <div className="flex items-center gap-4">
-        <span className="text-sm text-muted-foreground">Period:</span>
+        <span className="text-sm text-muted-foreground">Período:</span>
         <Select value={selectedMonth} onValueChange={setSelectedMonth}>
           <SelectTrigger className="w-[200px]" data-testid="select-report-month">
-            <SelectValue placeholder="Select month" />
+            <SelectValue placeholder={translations.reports.selectMonth} />
           </SelectTrigger>
           <SelectContent>
             {monthYearOptions.map((opt) => (
@@ -106,15 +108,15 @@ export default function ReportsPage() {
         <TabsList>
           <TabsTrigger value="allocations" data-testid="tab-allocations">
             <Calendar className="h-4 w-4 mr-2" />
-            Allocations
+            {translations.nav.allocation}
           </TabsTrigger>
           <TabsTrigger value="occurrences" data-testid="tab-occurrences">
             <AlertCircle className="h-4 w-4 mr-2" />
-            Occurrences
+            {translations.nav.occurrences}
           </TabsTrigger>
           <TabsTrigger value="documents" data-testid="tab-documents">
             <FileText className="h-4 w-4 mr-2" />
-            Documents
+            {translations.nav.documents}
           </TabsTrigger>
         </TabsList>
 
@@ -122,14 +124,14 @@ export default function ReportsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-4">
               <div>
-                <CardTitle>Monthly Allocation Report</CardTitle>
+                <CardTitle>{translations.reports.dailyAllocation}</CardTitle>
                 <CardDescription>
-                  {filteredAllocations.length} allocation records for {format(monthStart, "MMMM yyyy")}
+                  {filteredAllocations.length} registros de alocação para {format(monthStart, "MMMM 'de' yyyy", { locale: ptBR })}
                 </CardDescription>
               </div>
               <Button variant="outline" onClick={downloadAllocationCSV} data-testid="button-download-allocations">
                 <Download className="h-4 w-4 mr-2" />
-                Export CSV
+                {translations.reports.exportCsv}
               </Button>
             </CardHeader>
             <CardContent>
@@ -138,17 +140,17 @@ export default function ReportsPage() {
                   {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
                 </div>
               ) : filteredAllocations.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">No allocation records for this period</div>
+                <div className="text-center py-8 text-muted-foreground">{translations.allocation.noAllocationsInMonth}</div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Employee</TableHead>
-                        <TableHead>Service Post</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Notes</TableHead>
+                        <TableHead>{translations.common.date}</TableHead>
+                        <TableHead>{translations.occurrences.employee}</TableHead>
+                        <TableHead>{translations.nav.servicePosts}</TableHead>
+                        <TableHead>{translations.common.status}</TableHead>
+                        <TableHead>{translations.allocation.notes}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -164,7 +166,7 @@ export default function ReportsPage() {
                     </TableBody>
                   </Table>
                   {filteredAllocations.length > 50 && (
-                    <p className="text-sm text-muted-foreground mt-2">Showing 50 of {filteredAllocations.length} records. Export CSV for full data.</p>
+                    <p className="text-sm text-muted-foreground mt-2">Mostrando 50 de {filteredAllocations.length} registros. Exporte o CSV para dados completos.</p>
                   )}
                 </div>
               )}
@@ -176,14 +178,14 @@ export default function ReportsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-4">
               <div>
-                <CardTitle>Occurrence Report</CardTitle>
+                <CardTitle>{translations.reports.occurrencesList}</CardTitle>
                 <CardDescription>
-                  {filteredOccurrences.length} occurrences for {format(monthStart, "MMMM yyyy")}
+                  {filteredOccurrences.length} ocorrências para {format(monthStart, "MMMM 'de' yyyy", { locale: ptBR })}
                 </CardDescription>
               </div>
               <Button variant="outline" onClick={downloadOccurrenceCSV} data-testid="button-download-occurrences">
                 <Download className="h-4 w-4 mr-2" />
-                Export CSV
+                {translations.reports.exportCsv}
               </Button>
             </CardHeader>
             <CardContent>
@@ -192,16 +194,16 @@ export default function ReportsPage() {
                   {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
                 </div>
               ) : filteredOccurrences.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">No occurrences for this period</div>
+                <div className="text-center py-8 text-muted-foreground">{translations.occurrences.noOccurrences}</div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Employee</TableHead>
-                        <TableHead>Description</TableHead>
+                        <TableHead>{translations.common.date}</TableHead>
+                        <TableHead>{translations.occurrences.category}</TableHead>
+                        <TableHead>{translations.occurrences.employee}</TableHead>
+                        <TableHead>{translations.common.description}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -224,8 +226,8 @@ export default function ReportsPage() {
         <TabsContent value="documents">
           <Card>
             <CardHeader>
-              <CardTitle>Documents Overview</CardTitle>
-              <CardDescription>Summary of all uploaded documents</CardDescription>
+              <CardTitle>{translations.reports.documentsSent}</CardTitle>
+              <CardDescription>Resumo de todos os documentos enviados</CardDescription>
             </CardHeader>
             <CardContent>
               {documentsLoading ? (
@@ -237,25 +239,25 @@ export default function ReportsPage() {
                   <Card>
                     <CardContent className="p-4">
                       <div className="text-2xl font-semibold">{documents?.filter(d => d.documentType === "aso").length || 0}</div>
-                      <div className="text-sm text-muted-foreground">ASO Documents</div>
+                      <div className="text-sm text-muted-foreground">{translations.documents.aso}</div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-4">
                       <div className="text-2xl font-semibold">{documents?.filter(d => d.documentType === "certification").length || 0}</div>
-                      <div className="text-sm text-muted-foreground">Certifications</div>
+                      <div className="text-sm text-muted-foreground">{translations.documents.certification}</div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-4">
                       <div className="text-2xl font-semibold">{documents?.filter(d => d.documentType === "evidence").length || 0}</div>
-                      <div className="text-sm text-muted-foreground">Evidence Files</div>
+                      <div className="text-sm text-muted-foreground">{translations.documents.evidence}</div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-4">
                       <div className="text-2xl font-semibold">{documents?.length || 0}</div>
-                      <div className="text-sm text-muted-foreground">Total Documents</div>
+                      <div className="text-sm text-muted-foreground">Total de Documentos</div>
                     </CardContent>
                   </Card>
                 </div>

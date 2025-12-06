@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { translations } from "@/lib/translations";
 import type { ServicePost } from "@shared/schema";
 
 export default function ServicePostsPage() {
@@ -33,11 +34,11 @@ export default function ServicePostsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/service-posts"] });
-      toast({ title: "Success", description: "Service post deleted successfully" });
+      toast({ title: translations.common.success, description: translations.servicePosts.postDeleted });
       setDeleteId(null);
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to delete service post", variant: "destructive" });
+      toast({ title: translations.common.error, description: translations.errors.deleteError, variant: "destructive" });
     },
   });
 
@@ -58,8 +59,8 @@ export default function ServicePostsPage() {
   }) || [];
 
   const activeFilters = [
-    modalityFilter !== "all" ? `Modality: ${modalityFilter}` : null,
-    unitFilter !== "all" ? `Unit: ${unitFilter}` : null,
+    modalityFilter !== "all" ? `${translations.servicePosts.modality}: ${modalityFilter === "onsite" ? translations.servicePosts.onsite : modalityFilter === "hybrid" ? translations.servicePosts.hybrid : translations.servicePosts.remote}` : null,
+    unitFilter !== "all" ? `${translations.common.unit}: ${unitFilter}` : null,
   ].filter(Boolean);
 
   const clearFilters = () => {
@@ -70,7 +71,7 @@ export default function ServicePostsPage() {
   const columns = [
     {
       key: "postCode",
-      header: "Code",
+      header: translations.servicePosts.postCode,
       cell: (post: ServicePost) => (
         <span className="font-mono text-sm" data-testid={`text-post-code-${post.id}`}>
           {post.postCode}
@@ -79,7 +80,7 @@ export default function ServicePostsPage() {
     },
     {
       key: "postName",
-      header: "Name",
+      header: translations.servicePosts.postName,
       cell: (post: ServicePost) => (
         <div className="font-medium" data-testid={`text-post-name-${post.id}`}>
           {post.postName}
@@ -88,19 +89,19 @@ export default function ServicePostsPage() {
     },
     {
       key: "unit",
-      header: "Unit",
+      header: translations.common.unit,
       cell: (post: ServicePost) => post.unit,
     },
     {
       key: "modality",
-      header: "Modality",
+      header: translations.servicePosts.modality,
       cell: (post: ServicePost) => (
         <StatusBadge status={post.modality} />
       ),
     },
     {
       key: "actions",
-      header: "Actions",
+      header: translations.common.actions,
       className: "text-right",
       cell: (post: ServicePost) => (
         <div className="flex items-center justify-end gap-1">
@@ -134,14 +135,14 @@ export default function ServicePostsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Service Posts"
-        description="Manage service posts from contract requirements"
+        title={translations.servicePosts.title}
+        description={translations.servicePosts.pageDescription}
       >
         {isAdmin && (
           <Button asChild data-testid="button-add-post">
             <Link href="/service-posts/new">
               <Plus className="h-4 w-4 mr-2" />
-              Add Service Post
+              {translations.servicePosts.addPost}
             </Link>
           </Button>
         )}
@@ -152,7 +153,7 @@ export default function ServicePostsPage() {
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search by name, code, or unit..."
+              placeholder={translations.servicePosts.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -162,22 +163,22 @@ export default function ServicePostsPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
             <Select value={modalityFilter} onValueChange={setModalityFilter}>
-              <SelectTrigger className="w-[130px]" data-testid="select-modality-filter">
-                <SelectValue placeholder="Modality" />
+              <SelectTrigger className="w-[160px]" data-testid="select-modality-filter">
+                <SelectValue placeholder={translations.servicePosts.modality} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Modalities</SelectItem>
-                <SelectItem value="onsite">Onsite</SelectItem>
-                <SelectItem value="hybrid">Hybrid</SelectItem>
-                <SelectItem value="remote">Remote</SelectItem>
+                <SelectItem value="all">{translations.servicePosts.allModalities}</SelectItem>
+                <SelectItem value="onsite">{translations.servicePosts.onsite}</SelectItem>
+                <SelectItem value="hybrid">{translations.servicePosts.hybrid}</SelectItem>
+                <SelectItem value="remote">{translations.servicePosts.remote}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={unitFilter} onValueChange={setUnitFilter}>
-              <SelectTrigger className="w-[150px]" data-testid="select-unit-filter">
-                <SelectValue placeholder="Unit" />
+              <SelectTrigger className="w-[160px]" data-testid="select-unit-filter">
+                <SelectValue placeholder={translations.common.unit} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Units</SelectItem>
+                <SelectItem value="all">{translations.servicePosts.allUnits}</SelectItem>
                 {uniqueUnits.map((unit) => (
                   <SelectItem key={unit} value={unit}>{unit}</SelectItem>
                 ))}
@@ -187,7 +188,7 @@ export default function ServicePostsPage() {
         </div>
         {activeFilters.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-muted-foreground">Active filters:</span>
+            <span className="text-sm text-muted-foreground">Filtros ativos:</span>
             {activeFilters.map((filter) => (
               <Badge key={filter} variant="secondary" className="text-xs">
                 {filter}
@@ -195,7 +196,7 @@ export default function ServicePostsPage() {
             ))}
             <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 px-2" data-testid="button-clear-filters">
               <X className="h-3 w-3 mr-1" />
-              Clear all
+              {translations.common.clearFilters}
             </Button>
           </div>
         )}
@@ -205,17 +206,17 @@ export default function ServicePostsPage() {
         columns={columns}
         data={filteredPosts}
         isLoading={isLoading}
-        emptyMessage="No service posts found"
-        emptyDescription="Get started by adding your first service post."
+        emptyMessage={translations.servicePosts.noPosts}
+        emptyDescription="Comece adicionando seu primeiro posto de serviço."
         testIdPrefix="service-posts"
       />
 
       <ConfirmDialog
         open={deleteId !== null}
         onOpenChange={(open) => !open && setDeleteId(null)}
-        title="Delete Service Post"
-        description="Are you sure you want to delete this service post? This action cannot be undone."
-        confirmText="Delete"
+        title={translations.servicePosts.deletePost}
+        description={translations.servicePosts.deleteConfirm}
+        confirmText={translations.common.delete}
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
         variant="destructive"
         isLoading={deleteMutation.isPending}

@@ -2,37 +2,39 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Building2, Users, Briefcase, CalendarDays, FileText, BarChart3, Shield, CheckCircle } from "lucide-react";
+import { translations } from "@/lib/translations";
+import { DicaLogo } from "@/components/dica-logo";
 
 const features = [
   {
     icon: Users,
-    title: "Employee Management",
-    description: "Complete CRUD for employee records with CPF, function, unit, and status tracking.",
+    title: translations.landing.features.employees,
+    description: translations.landing.features.employeesDesc,
   },
   {
     icon: Briefcase,
-    title: "Service Posts",
-    description: "Manage service posts from Petrobras contracts with modality tracking.",
+    title: translations.landing.features.posts,
+    description: translations.landing.features.postsDesc,
   },
   {
     icon: CalendarDays,
-    title: "Daily Allocation",
-    description: "Track daily employee allocations with attendance status and reports.",
+    title: translations.landing.features.allocation,
+    description: translations.landing.features.allocationDesc,
   },
   {
     icon: FileText,
-    title: "Document Management",
-    description: "Upload and manage ASO, certifications, and contractual evidence.",
+    title: translations.landing.features.documents,
+    description: translations.landing.features.documentsDesc,
   },
   {
     icon: BarChart3,
-    title: "Reports & Analytics",
-    description: "Generate monthly allocation reports and occurrence summaries.",
+    title: translations.landing.features.reports,
+    description: translations.landing.features.reportsDesc,
   },
   {
     icon: Shield,
-    title: "Audit Trail",
-    description: "Complete audit logging for all system operations and changes.",
+    title: translations.landing.features.audit,
+    description: translations.landing.features.auditDesc,
   },
 ];
 
@@ -43,15 +45,13 @@ export default function Landing() {
         <div className="container mx-auto px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
-                <Building2 className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="text-lg font-semibold">Gestao Contratual</span>
+              <DicaLogo className="h-9 w-9" />
+              <span className="text-lg font-semibold">{translations.branding.appName}</span>
             </div>
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <Button asChild data-testid="button-login">
-                <a href="/api/login">Sign In</a>
+                <a href="/api/login">{translations.auth.login}</a>
               </Button>
             </div>
           </div>
@@ -63,18 +63,20 @@ export default function Landing() {
           <div className="container mx-auto px-6 lg:px-8">
             <div className="mx-auto max-w-3xl text-center">
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl" data-testid="text-hero-title">
-                Contract Management System
+                {translations.landing.title}
               </h1>
+              <p className="mt-2 text-xl text-muted-foreground">
+                {translations.landing.subtitle}
+              </p>
               <p className="mt-4 text-lg text-muted-foreground" data-testid="text-hero-description">
-                Complete solution for contract oversight and management. Track employees, 
-                service posts, daily allocations, and maintain full documentation compliance.
+                {translations.landing.description}
               </p>
               <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
                 <Button size="lg" asChild data-testid="button-get-started">
-                  <a href="/api/login">Get Started</a>
+                  <a href="/api/login">{translations.landing.loginButton}</a>
                 </Button>
                 <Button size="lg" variant="outline" asChild data-testid="button-learn-more">
-                  <a href="#features">Learn More</a>
+                  <a href="#features">{translations.common.learnMore}</a>
                 </Button>
               </div>
             </div>
@@ -85,10 +87,10 @@ export default function Landing() {
           <div className="container mx-auto px-6 lg:px-8">
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl" data-testid="text-features-title">
-                Everything You Need
+                {translations.landing.everythingYouNeed}
               </h2>
               <p className="mt-2 text-muted-foreground">
-                Comprehensive tools for contract oversight and compliance management.
+                {translations.landing.completeTools}
               </p>
             </div>
             <div className="mx-auto mt-12 grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -114,9 +116,9 @@ export default function Landing() {
             <div className="mx-auto max-w-3xl">
               <Card className="border-2 border-primary/20 bg-card">
                 <CardHeader className="text-center">
-                  <CardTitle className="text-xl font-semibold">Role-Based Access Control</CardTitle>
+                  <CardTitle className="text-xl font-semibold">{translations.landing.roleBasedAccess}</CardTitle>
                   <CardDescription>
-                    Two access levels designed for your workflow
+                    {translations.landing.accessLevelsDesigned}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -124,48 +126,48 @@ export default function Landing() {
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         <Shield className="h-5 w-5 text-primary" />
-                        <span className="font-medium">Administrator</span>
+                        <span className="font-medium">{translations.roles.admin}</span>
                       </div>
                       <ul className="space-y-2 text-sm text-muted-foreground">
                         <li className="flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-primary" />
-                          Full CRUD access to all modules
+                          {translations.landing.fullAccessModules}
                         </li>
                         <li className="flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-primary" />
-                          User management and settings
+                          {translations.landing.userManagementSettings}
                         </li>
                         <li className="flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-primary" />
-                          Document upload and management
+                          {translations.landing.uploadDocManagement}
                         </li>
                         <li className="flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-primary" />
-                          Report generation and export
+                          {translations.landing.reportGeneration}
                         </li>
                       </ul>
                     </div>
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         <Users className="h-5 w-5 text-muted-foreground" />
-                        <span className="font-medium">Viewer</span>
+                        <span className="font-medium">{translations.roles.viewer}</span>
                       </div>
                       <ul className="space-y-2 text-sm text-muted-foreground">
                         <li className="flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                          View all records and data
+                          {translations.landing.viewAllRecords}
                         </li>
                         <li className="flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                          Access reports and analytics
+                          {translations.landing.accessReportsAnalytics}
                         </li>
                         <li className="flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                          Export data to CSV
+                          {translations.landing.exportDataCsv}
                         </li>
                         <li className="flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                          Download documents
+                          {translations.landing.downloadDocuments}
                         </li>
                       </ul>
                     </div>
@@ -181,13 +183,13 @@ export default function Landing() {
         <div className="container mx-auto px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-muted-foreground" />
+              <DicaLogo className="h-5 w-5" />
               <span className="text-sm text-muted-foreground">
-                Gestao Contratual - Contract Management System
+                {translations.branding.fullTitle}
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
-              Contract Oversight Solution
+              {translations.landing.solutionForContracts}
             </p>
           </div>
         </div>

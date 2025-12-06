@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { translations } from "@/lib/translations";
 import type { Employee } from "@shared/schema";
 
 export default function EmployeesPage() {
@@ -33,11 +34,11 @@ export default function EmployeesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
-      toast({ title: "Success", description: "Employee deleted successfully" });
+      toast({ title: translations.common.success, description: translations.employees.employeeDeleted });
       setDeleteId(null);
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to delete employee", variant: "destructive" });
+      toast({ title: translations.common.error, description: translations.errors.deleteError, variant: "destructive" });
     },
   });
 
@@ -58,8 +59,8 @@ export default function EmployeesPage() {
   }) || [];
 
   const activeFilters = [
-    statusFilter !== "all" ? `Status: ${statusFilter}` : null,
-    unitFilter !== "all" ? `Unit: ${unitFilter}` : null,
+    statusFilter !== "all" ? `${translations.common.status}: ${statusFilter === "active" ? translations.employees.active : translations.employees.inactive}` : null,
+    unitFilter !== "all" ? `${translations.common.unit}: ${unitFilter}` : null,
   ].filter(Boolean);
 
   const clearFilters = () => {
@@ -70,7 +71,7 @@ export default function EmployeesPage() {
   const columns = [
     {
       key: "name",
-      header: "Name",
+      header: translations.employees.name,
       cell: (employee: Employee) => (
         <div className="font-medium" data-testid={`text-employee-name-${employee.id}`}>
           {employee.name}
@@ -79,7 +80,7 @@ export default function EmployeesPage() {
     },
     {
       key: "cpf",
-      header: "CPF",
+      header: translations.employees.cpf,
       cell: (employee: Employee) => (
         <span className="font-mono text-sm" data-testid={`text-employee-cpf-${employee.id}`}>
           {employee.cpf}
@@ -88,24 +89,24 @@ export default function EmployeesPage() {
     },
     {
       key: "function",
-      header: "Function",
+      header: translations.employees.functionPost,
       cell: (employee: Employee) => employee.functionPost,
     },
     {
       key: "unit",
-      header: "Unit",
+      header: translations.employees.unit,
       cell: (employee: Employee) => employee.unit,
     },
     {
       key: "status",
-      header: "Status",
+      header: translations.employees.status,
       cell: (employee: Employee) => (
         <StatusBadge status={employee.status} />
       ),
     },
     {
       key: "actions",
-      header: "Actions",
+      header: translations.common.actions,
       className: "text-right",
       cell: (employee: Employee) => (
         <div className="flex items-center justify-end gap-1">
@@ -139,14 +140,14 @@ export default function EmployeesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Employees"
-        description="Manage employee records and information"
+        title={translations.employees.title}
+        description={translations.employees.description}
       >
         {isAdmin && (
           <Button asChild data-testid="button-add-employee">
             <Link href="/employees/new">
               <Plus className="h-4 w-4 mr-2" />
-              Add Employee
+              {translations.employees.addEmployee}
             </Link>
           </Button>
         )}
@@ -157,7 +158,7 @@ export default function EmployeesPage() {
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search by name, CPF, or unit..."
+              placeholder={translations.employees.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -168,20 +169,20 @@ export default function EmployeesPage() {
             <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[130px]" data-testid="select-status-filter">
-                <SelectValue placeholder="Status" />
+                <SelectValue placeholder={translations.common.status} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="all">{translations.employees.allStatuses}</SelectItem>
+                <SelectItem value="active">{translations.employees.active}</SelectItem>
+                <SelectItem value="inactive">{translations.employees.inactive}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={unitFilter} onValueChange={setUnitFilter}>
               <SelectTrigger className="w-[150px]" data-testid="select-unit-filter">
-                <SelectValue placeholder="Unit" />
+                <SelectValue placeholder={translations.common.unit} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Units</SelectItem>
+                <SelectItem value="all">{translations.employees.allUnits}</SelectItem>
                 {uniqueUnits.map((unit) => (
                   <SelectItem key={unit} value={unit}>{unit}</SelectItem>
                 ))}
@@ -191,7 +192,7 @@ export default function EmployeesPage() {
         </div>
         {activeFilters.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-muted-foreground">Active filters:</span>
+            <span className="text-sm text-muted-foreground">{translations.common.filter}:</span>
             {activeFilters.map((filter) => (
               <Badge key={filter} variant="secondary" className="text-xs">
                 {filter}
@@ -199,7 +200,7 @@ export default function EmployeesPage() {
             ))}
             <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 px-2" data-testid="button-clear-filters">
               <X className="h-3 w-3 mr-1" />
-              Clear all
+              {translations.common.clearFilters}
             </Button>
           </div>
         )}
@@ -209,17 +210,17 @@ export default function EmployeesPage() {
         columns={columns}
         data={filteredEmployees}
         isLoading={isLoading}
-        emptyMessage="No employees found"
-        emptyDescription="Get started by adding your first employee."
+        emptyMessage={translations.employees.noEmployees}
+        emptyDescription={translations.employees.addEmployee}
         testIdPrefix="employees"
       />
 
       <ConfirmDialog
         open={deleteId !== null}
         onOpenChange={(open) => !open && setDeleteId(null)}
-        title="Delete Employee"
-        description="Are you sure you want to delete this employee? This action cannot be undone."
-        confirmText="Delete"
+        title={translations.employees.deleteEmployee}
+        description={translations.employees.deleteConfirm}
+        confirmText={translations.common.delete}
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
         variant="destructive"
         isLoading={deleteMutation.isPending}

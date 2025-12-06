@@ -1,0 +1,194 @@
+I want to expand the contract management system you created.
+Please implement the following improvements and updates in a structured and integrated way.
+All changes must be fully functional, consistent with the current architecture, and implemented across frontend, backend, database, and UI components.
+
+🔵 1. FULL TRANSLATION TO PORTUGUESE (PT-BR)
+
+Translate the entire user interface, including:
+
+sidebar menu
+
+all page titles
+
+all labels, inputs, placeholders
+
+table headers
+
+button texts
+
+dashboard widgets
+
+notification messages
+
+form validation messages
+
+empty states
+
+export options
+
+modal texts
+
+login and authentication flows
+
+Ensure that all strings appear in PT-BR and no English text remains.
+
+🔵 2. BRANDING & VISUAL CUSTOMIZATION
+
+Apply a clean professional theme for a Brazilian contractor solution:
+
+Replace system title with “Sistema de Gestão Contratual – Dica Serviços”
+
+Replace the sidebar logo with a placeholder logo component called DicaLogo
+
+Update color palette to governmental/contractual tones (blue + grey)
+
+Improve spacing and typography
+
+Ensure accessibility and responsive layout remains intact
+
+🔵 3. INTEGRATE ANEXO 1A & 1B REQUIREMENTS
+
+Based on the existing Service Posts and Document modules, enhance forms and database:
+
+3.1 Service Posts (Anexo 1A)
+
+Add fields:
+
+“Tipo de Posto”
+
+“Horário de Trabalho”
+
+“Escala / Regime”
+
+“Quantidade Prevista no Contrato”
+
+Update CRUD UI and database schema accordingly.
+
+3.2 Documentos do Contrato (Anexo 1B)
+
+Add required categories:
+
+Atestados
+
+Comprovantes
+
+Relatórios Mensais
+
+Evidências de Posto
+
+Treinamentos
+
+Certidões
+
+Outros (livre)
+
+Each upload must require:
+
+Categoria
+
+Mês de referência
+
+Observações
+
+Update filters and reports.
+
+🔵 4. ADVANCED DASHBOARD
+
+Transform the current dashboard into a contract oversight dashboard with:
+
+Total de Funcionários Ativos
+
+Total de Postos Contratuais
+
+Percentual de Alocação do Mês
+
+Ocorrências por categoria (gráfico de barras)
+
+Documentos vencendo nos próximos 30 dias
+
+Ausências críticas
+
+Tendência de alocações nos últimos 90 dias
+
+Use charts that already exist in the project or create new components as needed.
+
+🔵 5. AUTOMATED MONTHLY REPORTS (PDF + CSV)
+
+Create a new backend route and UI button to export a PDF monthly report including:
+
+lista de funcionários
+
+lista de postos
+
+alocação diária consolidada
+
+ocorrências
+
+documentos enviados
+
+documentos faltantes
+
+pendências críticas
+
+PDF must be well formatted.
+
+Keep CSV export as it is.
+
+🔵 6. WORKFLOWS & ALERTS
+
+Implement workflows (no email required yet):
+
+6.1 Critical alert generation
+
+Auto-generate alerts for:
+
+funcionário sem alocação
+
+documento vencido
+
+ocorrência não tratada
+
+Display alerts in a new Dashboard card: “Pendências do Contrato”.
+
+6.2 Internal notifications
+
+Allow admins to mark alerts as resolved.
+
+🔵 7. ROLES & PERMISSIONS
+
+Add new roles:
+
+Admin Dica (full access)
+
+Operador Dica (insert data, no admin settings)
+
+Fiscal Petrobras (view-only + export)
+
+Update middleware and route restrictions accordingly.
+
+🔵 8. CODE CLEANUP & EXPORT PREPARATION
+
+ensure consistent components
+
+remove unused code
+
+refactor English variables into PT-BR names ONLY in UI, backend schema can remain English
+
+ensure database schema is documented
+
+ensure project is ready for migration to Vercel/Supabase
+
+📌 IMPORTANT
+
+All changes must be backward-compatible with existing data.
+If schema changes require migrations, automatically generate migration scripts.
+
+✔ When finished, present:
+
+list of updated files
+
+summary of database migrations
+
+instructions for testing
+
+confirmation that the system is ready for export to production

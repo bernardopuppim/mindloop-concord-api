@@ -11,13 +11,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { translations } from "@/lib/translations";
 import type { Occurrence, Employee } from "@shared/schema";
 
 const formSchema = z.object({
-  date: z.string().min(1, "Date is required"),
+  date: z.string().min(1, translations.validation.required),
   employeeId: z.string().optional(),
   category: z.enum(["absence", "substitution", "issue", "note"]),
-  description: z.string().min(5, "Description must be at least 5 characters"),
+  description: z.string().min(5, translations.validation.descriptionMinLength.replace("{min}", "5")),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -76,15 +77,15 @@ export function OccurrenceDialog({ open, onOpenChange, occurrence, employees }: 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/occurrences"] });
       toast({
-        title: "Success",
-        description: `Occurrence ${isEditing ? "updated" : "created"} successfully`,
+        title: translations.common.success,
+        description: isEditing ? translations.occurrences.occurrenceUpdated : translations.occurrences.occurrenceCreated,
       });
       onOpenChange(false);
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: error.message || `Failed to ${isEditing ? "update" : "create"} occurrence`,
+        title: translations.common.error,
+        description: error.message || translations.errors.saveError,
         variant: "destructive",
       });
     },
@@ -94,7 +95,7 @@ export function OccurrenceDialog({ open, onOpenChange, occurrence, employees }: 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit Occurrence" : "Add Occurrence"}</DialogTitle>
+          <DialogTitle>{isEditing ? translations.occurrences.editOccurrence : translations.occurrences.addOccurrence}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
@@ -103,7 +104,7 @@ export function OccurrenceDialog({ open, onOpenChange, occurrence, employees }: 
               name="date"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Date *</FormLabel>
+                  <FormLabel>{translations.occurrences.date} *</FormLabel>
                   <FormControl>
                     <Input type="date" {...field} data-testid="input-occurrence-date" />
                   </FormControl>
@@ -117,18 +118,18 @@ export function OccurrenceDialog({ open, onOpenChange, occurrence, employees }: 
               name="category"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Category *</FormLabel>
+                  <FormLabel>{translations.occurrences.category} *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger data-testid="select-occurrence-category">
-                        <SelectValue placeholder="Select category" />
+                        <SelectValue placeholder={translations.common.selectOption} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="absence">Absence</SelectItem>
-                      <SelectItem value="substitution">Substitution</SelectItem>
-                      <SelectItem value="issue">Issue</SelectItem>
-                      <SelectItem value="note">Note</SelectItem>
+                      <SelectItem value="absence">{translations.occurrences.absence}</SelectItem>
+                      <SelectItem value="substitution">{translations.occurrences.substitution}</SelectItem>
+                      <SelectItem value="issue">{translations.occurrences.issue}</SelectItem>
+                      <SelectItem value="note">{translations.occurrences.note}</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -141,15 +142,15 @@ export function OccurrenceDialog({ open, onOpenChange, occurrence, employees }: 
               name="employeeId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Employee (Optional)</FormLabel>
+                  <FormLabel>{translations.occurrences.employee} ({translations.common.optional})</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger data-testid="select-occurrence-employee">
-                        <SelectValue placeholder="Select employee (optional)" />
+                        <SelectValue placeholder={`${translations.allocation.selectEmployee} (${translations.common.optional})`} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="">Nenhum</SelectItem>
                       {employees.map((employee) => (
                         <SelectItem key={employee.id} value={employee.id.toString()}>
                           {employee.name}
@@ -167,10 +168,10 @@ export function OccurrenceDialog({ open, onOpenChange, occurrence, employees }: 
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description *</FormLabel>
+                  <FormLabel>{translations.common.description} *</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Describe the occurrence..."
+                      placeholder="Descreva a ocorrência..."
                       rows={4}
                       {...field}
                       data-testid="input-occurrence-description"
@@ -183,10 +184,10 @@ export function OccurrenceDialog({ open, onOpenChange, occurrence, employees }: 
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel">
-                Cancel
+                {translations.common.cancel}
               </Button>
               <Button type="submit" disabled={mutation.isPending} data-testid="button-submit">
-                {mutation.isPending ? "Saving..." : isEditing ? "Update" : "Create"}
+                {mutation.isPending ? "Salvando..." : isEditing ? translations.common.update : translations.common.save}
               </Button>
             </DialogFooter>
           </form>

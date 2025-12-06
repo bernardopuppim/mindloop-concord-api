@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDateTime } from "@/lib/authUtils";
+import { translations } from "@/lib/translations";
 import type { User, AuditLog } from "@shared/schema";
 
 export default function AdminPage() {
@@ -32,23 +33,23 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      toast({ title: "Success", description: "User role updated successfully" });
+      toast({ title: translations.common.success, description: translations.admin.userUpdated });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to update user role", variant: "destructive" });
+      toast({ title: translations.common.error, description: translations.errors.saveError, variant: "destructive" });
     },
   });
 
   if (!isAdmin) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Admin Settings" />
+        <PageHeader title={translations.admin.title} />
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Shield className="h-12 w-12 text-muted-foreground mb-4" />
-            <h2 className="text-lg font-semibold">Access Denied</h2>
+            <h2 className="text-lg font-semibold">{translations.auth.accessDenied}</h2>
             <p className="text-muted-foreground text-center max-w-md">
-              You do not have permission to access admin settings. Contact an administrator for assistance.
+              {translations.auth.permissionRequired}
             </p>
           </CardContent>
         </Card>
@@ -66,8 +67,8 @@ export default function AdminPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Admin Settings"
-        description="Manage users and view system activity"
+        title={translations.admin.title}
+        description={translations.admin.description}
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -75,9 +76,9 @@ export default function AdminPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              User Management
+              {translations.admin.userManagement}
             </CardTitle>
-            <CardDescription>Manage user roles and permissions</CardDescription>
+            <CardDescription>{translations.admin.userManagementDescription}</CardDescription>
           </CardHeader>
           <CardContent>
             {usersLoading ? (
@@ -93,7 +94,7 @@ export default function AdminPage() {
                 ))}
               </div>
             ) : users?.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No users found</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{translations.admin.noUsers}</p>
             ) : (
               <div className="space-y-4">
                 {users?.map((user) => (
@@ -106,7 +107,7 @@ export default function AdminPage() {
                       <p className="text-sm font-medium truncate">
                         {user.firstName || user.lastName 
                           ? `${user.firstName || ""} ${user.lastName || ""}`.trim()
-                          : user.email || "Unknown User"}
+                          : user.email || translations.admin.unknownUser}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                     </div>
@@ -115,12 +116,12 @@ export default function AdminPage() {
                       onValueChange={(role) => updateRoleMutation.mutate({ userId: user.id, role })}
                       disabled={user.id === currentUser?.id || updateRoleMutation.isPending}
                     >
-                      <SelectTrigger className="w-[100px]" data-testid={`select-role-${user.id}`}>
+                      <SelectTrigger className="w-[120px]" data-testid={`select-role-${user.id}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="viewer">Viewer</SelectItem>
+                        <SelectItem value="admin">{translations.roles.admin}</SelectItem>
+                        <SelectItem value="viewer">{translations.roles.viewer}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -134,30 +135,30 @@ export default function AdminPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5" />
-              System Stats
+              {translations.admin.systemStats}
             </CardTitle>
-            <CardDescription>Overview of system activity</CardDescription>
+            <CardDescription>{translations.admin.systemStatsDescription}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-md border p-4">
                 <div className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Total Users</span>
+                  <span className="text-sm font-medium">{translations.admin.totalUsers}</span>
                 </div>
                 <p className="mt-2 text-2xl font-semibold">{users?.length || 0}</p>
               </div>
               <div className="rounded-md border p-4">
                 <div className="flex items-center gap-2">
                   <Shield className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Admins</span>
+                  <span className="text-sm font-medium">{translations.admin.administrators}</span>
                 </div>
                 <p className="mt-2 text-2xl font-semibold">{users?.filter(u => u.role === "admin").length || 0}</p>
               </div>
               <div className="rounded-md border p-4 sm:col-span-2">
                 <div className="flex items-center gap-2">
                   <Clock className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium">Audit Log Entries</span>
+                  <span className="text-sm font-medium">{translations.admin.auditRecords}</span>
                 </div>
                 <p className="mt-2 text-2xl font-semibold">{auditLogs?.length || 0}</p>
               </div>
@@ -170,9 +171,9 @@ export default function AdminPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Audit Log
+            {translations.admin.auditLog}
           </CardTitle>
-          <CardDescription>Recent system activity and changes</CardDescription>
+          <CardDescription>Atividade recente do sistema e alterações</CardDescription>
         </CardHeader>
         <CardContent>
           {logsLoading ? (
@@ -180,17 +181,17 @@ export default function AdminPage() {
               {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
           ) : auditLogs?.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No audit log entries</p>
+            <p className="text-sm text-muted-foreground text-center py-8">Nenhum registro de auditoria</p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Timestamp</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Entity</TableHead>
-                    <TableHead>Entity ID</TableHead>
+                    <TableHead>Data/Hora</TableHead>
+                    <TableHead>Usuário</TableHead>
+                    <TableHead>Ação</TableHead>
+                    <TableHead>Entidade</TableHead>
+                    <TableHead>ID da Entidade</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -199,14 +200,16 @@ export default function AdminPage() {
                       <TableCell className="text-sm">
                         {log.timestamp ? formatDateTime(log.timestamp) : "-"}
                       </TableCell>
-                      <TableCell className="text-sm">{log.userId || "System"}</TableCell>
+                      <TableCell className="text-sm">{log.userId || "Sistema"}</TableCell>
                       <TableCell>
                         <Badge variant={
                           log.action === "CREATE" ? "default" :
                           log.action === "UPDATE" ? "secondary" :
                           log.action === "DELETE" ? "destructive" : "outline"
                         }>
-                          {log.action}
+                          {log.action === "CREATE" ? "CRIAR" :
+                           log.action === "UPDATE" ? "ATUALIZAR" :
+                           log.action === "DELETE" ? "EXCLUIR" : log.action}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm">{log.entityType}</TableCell>
@@ -216,7 +219,7 @@ export default function AdminPage() {
                 </TableBody>
               </Table>
               {auditLogs && auditLogs.length > 20 && (
-                <p className="text-sm text-muted-foreground mt-2">Showing 20 of {auditLogs.length} entries</p>
+                <p className="text-sm text-muted-foreground mt-2">Mostrando 20 de {auditLogs.length} registros</p>
               )}
             </div>
           )}

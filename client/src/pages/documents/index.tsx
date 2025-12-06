@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDate } from "@/lib/authUtils";
+import { translations } from "@/lib/translations";
 import type { Document, Employee, ServicePost } from "@shared/schema";
 
 function getFileIcon(mimeType: string) {
@@ -50,7 +51,7 @@ function ExpirationBadge({ expirationDate }: { expirationDate: string | null }) 
     return (
       <Badge variant="destructive" className="text-xs gap-1">
         <AlertTriangle className="h-3 w-3" />
-        Expired
+        {translations.documents.expired}
       </Badge>
     );
   }
@@ -59,7 +60,7 @@ function ExpirationBadge({ expirationDate }: { expirationDate: string | null }) 
     return (
       <Badge variant="outline" className="text-xs gap-1 border-yellow-500 text-yellow-600 dark:text-yellow-400">
         <Clock className="h-3 w-3" />
-        {daysLeft === 0 ? "Today" : `${daysLeft}d left`}
+        {daysLeft === 0 ? translations.common.today : `${daysLeft}d`}
       </Badge>
     );
   }
@@ -67,7 +68,7 @@ function ExpirationBadge({ expirationDate }: { expirationDate: string | null }) 
   return (
     <span className="text-xs text-muted-foreground flex items-center gap-1">
       <Calendar className="h-3 w-3" />
-      {formatDate(expirationDate)}
+      {expirationDate ? formatDate(expirationDate) : "-"}
     </span>
   );
 }
@@ -119,11 +120,11 @@ export default function DocumentsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/documents/expiring"] });
       queryClient.invalidateQueries({ queryKey: ["/api/documents/expired"] });
-      toast({ title: "Success", description: "Document deleted successfully" });
+      toast({ title: translations.common.success, description: translations.documents.documentDeleted });
       setDeleteId(null);
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to delete document", variant: "destructive" });
+      toast({ title: translations.common.error, description: translations.errors.deleteError, variant: "destructive" });
     },
   });
 
@@ -138,9 +139,9 @@ export default function DocumentsPage() {
   }) || [];
 
   const activeFilters = [
-    typeFilter !== "all" ? `Type: ${typeFilter}` : null,
-    employeeFilter !== "all" ? `Employee: ${employeeMap.get(Number(employeeFilter))?.name || employeeFilter}` : null,
-    postFilter !== "all" ? `Post: ${postMap.get(Number(postFilter))?.postName || postFilter}` : null,
+    typeFilter !== "all" ? `${translations.common.type}: ${typeFilter}` : null,
+    employeeFilter !== "all" ? `${translations.documents.employee}: ${employeeMap.get(Number(employeeFilter))?.name || employeeFilter}` : null,
+    postFilter !== "all" ? `${translations.documents.post}: ${postMap.get(Number(postFilter))?.postName || postFilter}` : null,
   ].filter(Boolean);
 
   const clearFilters = () => {
@@ -152,7 +153,7 @@ export default function DocumentsPage() {
   const columns = [
     {
       key: "name",
-      header: "File Name",
+      header: translations.documents.filename,
       cell: (doc: Document) => {
         const Icon = getFileIcon(doc.mimeType);
         return (
@@ -167,30 +168,30 @@ export default function DocumentsPage() {
     },
     {
       key: "type",
-      header: "Type",
+      header: translations.common.type,
       cell: (doc: Document) => <DocTypeBadge type={doc.documentType} />,
     },
     {
       key: "linkedTo",
-      header: "Linked To",
+      header: translations.documents.linkedTo,
       cell: (doc: Document) => {
         if (doc.employeeId) {
           const employee = employeeMap.get(doc.employeeId);
-          return <span className="text-sm">{employee?.name || `Employee #${doc.employeeId}`}</span>;
+          return <span className="text-sm">{employee?.name || `Funcionário #${doc.employeeId}`}</span>;
         }
         if (doc.postId) {
           const post = postMap.get(doc.postId);
-          return <span className="text-sm">{post?.postName || `Post #${doc.postId}`}</span>;
+          return <span className="text-sm">{post?.postName || `Posto #${doc.postId}`}</span>;
         }
         if (doc.monthYear) {
           return <span className="text-sm">{doc.monthYear}</span>;
         }
-        return <span className="text-sm text-muted-foreground">None</span>;
+        return <span className="text-sm text-muted-foreground">{translations.documents.none}</span>;
       },
     },
     {
       key: "size",
-      header: "Size",
+      header: translations.documents.size,
       cell: (doc: Document) => (
         <span className="text-sm text-muted-foreground">
           {(doc.size / 1024).toFixed(1)} KB
@@ -199,12 +200,12 @@ export default function DocumentsPage() {
     },
     {
       key: "expiration",
-      header: "Expiration",
+      header: translations.documents.expirationDate,
       cell: (doc: Document) => <ExpirationBadge expirationDate={(doc as any).expirationDate} />,
     },
     {
       key: "date",
-      header: "Uploaded",
+      header: translations.documents.uploadedAt,
       cell: (doc: Document) => (
         <span className="text-sm text-muted-foreground">
           {doc.createdAt ? formatDate(doc.createdAt) : "N/A"}
@@ -213,7 +214,7 @@ export default function DocumentsPage() {
     },
     {
       key: "actions",
-      header: "Actions",
+      header: translations.common.actions,
       className: "text-right",
       cell: (doc: Document) => (
         <div className="flex items-center justify-end gap-1">
@@ -270,13 +271,13 @@ export default function DocumentsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Documents"
-        description="Manage uploaded documents and evidence"
+        title={translations.documents.title}
+        description={translations.documents.description}
       >
         {isAdmin && (
           <Button onClick={() => setIsUploadOpen(true)} data-testid="button-upload-document">
             <Plus className="h-4 w-4 mr-2" />
-            Upload Document
+            {translations.documents.uploadDocument}
           </Button>
         )}
       </PageHeader>
@@ -286,21 +287,21 @@ export default function DocumentsPage() {
           {expiredCount > 0 && (
             <Card className="flex-1 border-destructive/50">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Expired Documents</CardTitle>
+                <CardTitle className="text-sm font-medium">{translations.documents.expiredDocuments}</CardTitle>
                 <AlertTriangle className="h-4 w-4 text-destructive" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-expired-count">{expiredCount}</div>
                 <p className="text-xs text-muted-foreground">
-                  Documents requiring immediate attention
+                  Documentos que requerem atenção imediata
                 </p>
                 <Button 
-                  variant="link" 
-                  className="p-0 h-auto text-xs mt-1" 
+                  variant="ghost" 
+                  className="p-0 h-auto text-xs mt-1 underline" 
                   onClick={() => setActiveTab("expired")}
                   data-testid="button-view-expired"
                 >
-                  View expired documents
+                  Ver documentos vencidos
                 </Button>
               </CardContent>
             </Card>
@@ -308,21 +309,21 @@ export default function DocumentsPage() {
           {expiringCount > 0 && (
             <Card className="flex-1 border-yellow-500/50">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
+                <CardTitle className="text-sm font-medium">{translations.documents.expiringDocuments}</CardTitle>
                 <Clock className="h-4 w-4 text-yellow-500" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-expiring-count">{expiringCount}</div>
                 <p className="text-xs text-muted-foreground">
-                  Documents expiring within 30 days
+                  Documentos vencendo nos próximos 30 dias
                 </p>
                 <Button 
-                  variant="link" 
-                  className="p-0 h-auto text-xs mt-1" 
+                  variant="ghost" 
+                  className="p-0 h-auto text-xs mt-1 underline" 
                   onClick={() => setActiveTab("expiring")}
                   data-testid="button-view-expiring"
                 >
-                  View expiring documents
+                  Ver documentos vencendo
                 </Button>
               </CardContent>
             </Card>
@@ -333,10 +334,10 @@ export default function DocumentsPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList data-testid="tabs-document-status">
           <TabsTrigger value="all" data-testid="tab-all-documents">
-            All Documents
+            Todos os Documentos
           </TabsTrigger>
           <TabsTrigger value="expiring" data-testid="tab-expiring-documents">
-            Expiring Soon
+            Vencendo em Breve
             {expiringCount > 0 && (
               <Badge variant="outline" className="ml-2 text-xs border-yellow-500 text-yellow-600 dark:text-yellow-400">
                 {expiringCount}
@@ -344,7 +345,7 @@ export default function DocumentsPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="expired" data-testid="tab-expired-documents">
-            Expired
+            Vencidos
             {expiredCount > 0 && (
               <Badge variant="destructive" className="ml-2 text-xs">
                 {expiredCount}
@@ -360,7 +361,7 @@ export default function DocumentsPage() {
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="Search by filename..."
+                    placeholder={translations.documents.searchPlaceholder}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9"
@@ -371,23 +372,23 @@ export default function DocumentsPage() {
                   <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
                   <Select value={typeFilter} onValueChange={setTypeFilter}>
                     <SelectTrigger className="w-[150px]" data-testid="select-type-filter">
-                      <SelectValue placeholder="Type" />
+                      <SelectValue placeholder={translations.common.type} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="aso">ASO</SelectItem>
-                      <SelectItem value="certification">Certification</SelectItem>
-                      <SelectItem value="evidence">Evidence</SelectItem>
-                      <SelectItem value="contract">Contract</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="all">{translations.documents.allTypes}</SelectItem>
+                      <SelectItem value="aso">{translations.documents.aso}</SelectItem>
+                      <SelectItem value="certification">{translations.documents.certification}</SelectItem>
+                      <SelectItem value="evidence">{translations.documents.evidence}</SelectItem>
+                      <SelectItem value="contract">{translations.documents.contract}</SelectItem>
+                      <SelectItem value="other">{translations.documents.other}</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
                     <SelectTrigger className="w-[180px]" data-testid="select-employee-filter">
-                      <SelectValue placeholder="Employee" />
+                      <SelectValue placeholder={translations.documents.employee} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Employees</SelectItem>
+                      <SelectItem value="all">{translations.documents.allEmployees}</SelectItem>
                       {employees?.map((emp) => (
                         <SelectItem key={emp.id} value={emp.id.toString()}>{emp.name}</SelectItem>
                       ))}
@@ -395,10 +396,10 @@ export default function DocumentsPage() {
                   </Select>
                   <Select value={postFilter} onValueChange={setPostFilter}>
                     <SelectTrigger className="w-[180px]" data-testid="select-post-filter">
-                      <SelectValue placeholder="Service Post" />
+                      <SelectValue placeholder={translations.documents.post} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Posts</SelectItem>
+                      <SelectItem value="all">{translations.documents.allPosts}</SelectItem>
                       {servicePosts?.map((post) => (
                         <SelectItem key={post.id} value={post.id.toString()}>{post.postCode} - {post.postName}</SelectItem>
                       ))}
@@ -408,7 +409,7 @@ export default function DocumentsPage() {
               </div>
               {activeFilters.length > 0 && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm text-muted-foreground">Active filters:</span>
+                  <span className="text-sm text-muted-foreground">Filtros ativos:</span>
                   {activeFilters.map((filter) => (
                     <Badge key={filter} variant="secondary" className="text-xs">
                       {filter}
@@ -416,7 +417,7 @@ export default function DocumentsPage() {
                   ))}
                   <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 px-2" data-testid="button-clear-filters">
                     <X className="h-3 w-3 mr-1" />
-                    Clear all
+                    {translations.common.clearFilters}
                   </Button>
                 </div>
               )}
@@ -427,8 +428,8 @@ export default function DocumentsPage() {
             columns={columns}
             data={getTabData()}
             isLoading={getTabLoading()}
-            emptyMessage={activeTab === "all" ? "No documents found" : activeTab === "expiring" ? "No documents expiring soon" : "No expired documents"}
-            emptyDescription={activeTab === "all" ? "Upload documents to store evidence and certifications." : activeTab === "expiring" ? "All documents are up to date." : "No documents have expired."}
+            emptyMessage={activeTab === "all" ? translations.documents.noDocuments : activeTab === "expiring" ? "Nenhum documento vencendo em breve" : "Nenhum documento vencido"}
+            emptyDescription={activeTab === "all" ? "Envie documentos para armazenar evidências e certificações." : activeTab === "expiring" ? "Todos os documentos estão em dia." : "Nenhum documento expirou."}
             testIdPrefix="documents"
           />
         </TabsContent>
@@ -444,9 +445,9 @@ export default function DocumentsPage() {
       <ConfirmDialog
         open={deleteId !== null}
         onOpenChange={(open) => !open && setDeleteId(null)}
-        title="Delete Document"
-        description="Are you sure you want to delete this document? This action cannot be undone."
-        confirmText="Delete"
+        title={translations.documents.deleteDocument}
+        description={translations.documents.deleteConfirm}
+        confirmText={translations.common.delete}
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
         variant="destructive"
         isLoading={deleteMutation.isPending}

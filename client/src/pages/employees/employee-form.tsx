@@ -13,13 +13,14 @@ import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatCPF } from "@/lib/authUtils";
-import type { Employee, InsertEmployee } from "@shared/schema";
+import { translations } from "@/lib/translations";
+import type { Employee } from "@shared/schema";
 
 const formSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  cpf: z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, "CPF must be in format XXX.XXX.XXX-XX"),
-  functionPost: z.string().min(2, "Function is required"),
-  unit: z.string().min(2, "Unit is required"),
+  name: z.string().min(2, translations.validation.minLength.replace("{min}", "2")),
+  cpf: z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, translations.validation.invalidCpf),
+  functionPost: z.string().min(2, translations.validation.required),
+  unit: z.string().min(2, translations.validation.required),
   status: z.enum(["active", "inactive"]),
 });
 
@@ -73,15 +74,15 @@ export default function EmployeeForm({ employeeId }: EmployeeFormProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       toast({
-        title: "Success",
-        description: `Employee ${isEditing ? "updated" : "created"} successfully`,
+        title: translations.common.success,
+        description: isEditing ? translations.employees.employeeUpdated : translations.employees.employeeCreated,
       });
       setLocation("/employees");
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: error.message || `Failed to ${isEditing ? "update" : "create"} employee`,
+        title: translations.common.error,
+        description: error.message || translations.errors.saveError,
         variant: "destructive",
       });
     },
@@ -95,7 +96,7 @@ export default function EmployeeForm({ employeeId }: EmployeeFormProps) {
   if (isEditing && isLoading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Loading..." />
+        <PageHeader title={translations.common.loading} />
         <Card>
           <CardContent className="p-6">
             <div className="animate-pulse space-y-4">
@@ -112,13 +113,13 @@ export default function EmployeeForm({ employeeId }: EmployeeFormProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isEditing ? "Edit Employee" : "Add Employee"}
-        description={isEditing ? "Update employee information" : "Create a new employee record"}
+        title={isEditing ? translations.employees.editEmployee : translations.employees.addEmployee}
+        description={isEditing ? translations.employees.editEmployee : translations.employees.addEmployee}
       />
 
       <Card className="max-w-3xl">
         <CardHeader>
-          <CardTitle>Employee Information</CardTitle>
+          <CardTitle>{translations.employees.title}</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -129,9 +130,9 @@ export default function EmployeeForm({ employeeId }: EmployeeFormProps) {
                   name="name"
                   render={({ field }) => (
                     <FormItem className="sm:col-span-2">
-                      <FormLabel>Full Name *</FormLabel>
+                      <FormLabel>{translations.employees.name} *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter full name" {...field} data-testid="input-employee-name" />
+                        <Input placeholder={translations.employees.name} {...field} data-testid="input-employee-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -143,7 +144,7 @@ export default function EmployeeForm({ employeeId }: EmployeeFormProps) {
                   name="cpf"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>CPF *</FormLabel>
+                      <FormLabel>{translations.employees.cpf} *</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="000.000.000-00"
@@ -164,16 +165,16 @@ export default function EmployeeForm({ employeeId }: EmployeeFormProps) {
                   name="status"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Status *</FormLabel>
+                      <FormLabel>{translations.employees.status} *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-employee-status">
-                            <SelectValue placeholder="Select status" />
+                            <SelectValue placeholder={translations.common.selectOption} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
+                          <SelectItem value="active">{translations.employees.active}</SelectItem>
+                          <SelectItem value="inactive">{translations.employees.inactive}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -186,9 +187,9 @@ export default function EmployeeForm({ employeeId }: EmployeeFormProps) {
                   name="functionPost"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Function / Post *</FormLabel>
+                      <FormLabel>{translations.employees.functionPost} *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter function or position" {...field} data-testid="input-employee-function" />
+                        <Input placeholder={translations.employees.functionPost} {...field} data-testid="input-employee-function" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -200,9 +201,9 @@ export default function EmployeeForm({ employeeId }: EmployeeFormProps) {
                   name="unit"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Unit *</FormLabel>
+                      <FormLabel>{translations.employees.unit} *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter unit" {...field} data-testid="input-employee-unit" />
+                        <Input placeholder={translations.employees.unit} {...field} data-testid="input-employee-unit" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -217,10 +218,10 @@ export default function EmployeeForm({ employeeId }: EmployeeFormProps) {
                   onClick={() => setLocation("/employees")}
                   data-testid="button-cancel"
                 >
-                  Cancel
+                  {translations.common.cancel}
                 </Button>
                 <Button type="submit" disabled={mutation.isPending} data-testid="button-submit">
-                  {mutation.isPending ? "Saving..." : isEditing ? "Update Employee" : "Create Employee"}
+                  {mutation.isPending ? translations.common.loading : isEditing ? translations.common.update : translations.common.save}
                 </Button>
               </div>
             </form>

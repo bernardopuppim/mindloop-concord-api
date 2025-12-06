@@ -13,13 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { translations } from "@/lib/translations";
 import type { ServicePost } from "@shared/schema";
 
 const formSchema = z.object({
-  postCode: z.string().min(1, "Post code is required"),
-  postName: z.string().min(2, "Post name must be at least 2 characters"),
+  postCode: z.string().min(1, translations.validation.required),
+  postName: z.string().min(2, "Nome do posto deve ter pelo menos 2 caracteres"),
   description: z.string().optional(),
-  unit: z.string().min(2, "Unit is required"),
+  unit: z.string().min(2, translations.validation.required),
   modality: z.enum(["onsite", "hybrid", "remote"]),
 });
 
@@ -73,15 +74,15 @@ export default function ServicePostForm({ postId }: ServicePostFormProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/service-posts"] });
       toast({
-        title: "Success",
-        description: `Service post ${isEditing ? "updated" : "created"} successfully`,
+        title: translations.common.success,
+        description: isEditing ? translations.servicePosts.postUpdated : translations.servicePosts.postCreated,
       });
       setLocation("/service-posts");
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: error.message || `Failed to ${isEditing ? "update" : "create"} service post`,
+        title: translations.common.error,
+        description: error.message || translations.errors.saveError,
         variant: "destructive",
       });
     },
@@ -90,7 +91,7 @@ export default function ServicePostForm({ postId }: ServicePostFormProps) {
   if (isEditing && isLoading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Loading..." />
+        <PageHeader title={translations.common.loading} />
         <Card>
           <CardContent className="p-6">
             <div className="animate-pulse space-y-4">
@@ -107,13 +108,13 @@ export default function ServicePostForm({ postId }: ServicePostFormProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isEditing ? "Edit Service Post" : "Add Service Post"}
-        description={isEditing ? "Update service post information" : "Create a new service post"}
+        title={isEditing ? translations.servicePosts.editPost : translations.servicePosts.addPost}
+        description={isEditing ? "Atualizar informações do posto de serviço" : "Criar um novo posto de serviço"}
       />
 
       <Card className="max-w-3xl">
         <CardHeader>
-          <CardTitle>Service Post Information</CardTitle>
+          <CardTitle>Informações do Posto de Serviço</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -124,9 +125,9 @@ export default function ServicePostForm({ postId }: ServicePostFormProps) {
                   name="postCode"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Post Code *</FormLabel>
+                      <FormLabel>{translations.servicePosts.postCode} *</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., POST-001" {...field} className="font-mono" data-testid="input-post-code" />
+                        <Input placeholder="Ex: POST-001" {...field} className="font-mono" data-testid="input-post-code" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -138,17 +139,17 @@ export default function ServicePostForm({ postId }: ServicePostFormProps) {
                   name="modality"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Modality *</FormLabel>
+                      <FormLabel>{translations.servicePosts.modality} *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-post-modality">
-                            <SelectValue placeholder="Select modality" />
+                            <SelectValue placeholder={translations.common.selectOption} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="onsite">On-site</SelectItem>
-                          <SelectItem value="hybrid">Hybrid</SelectItem>
-                          <SelectItem value="remote">Remote</SelectItem>
+                          <SelectItem value="onsite">{translations.servicePosts.onsite}</SelectItem>
+                          <SelectItem value="hybrid">{translations.servicePosts.hybrid}</SelectItem>
+                          <SelectItem value="remote">{translations.servicePosts.remote}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -161,9 +162,9 @@ export default function ServicePostForm({ postId }: ServicePostFormProps) {
                   name="postName"
                   render={({ field }) => (
                     <FormItem className="sm:col-span-2">
-                      <FormLabel>Post Name *</FormLabel>
+                      <FormLabel>{translations.servicePosts.postName} *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter post name" {...field} data-testid="input-post-name" />
+                        <Input placeholder="Digite o nome do posto" {...field} data-testid="input-post-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -175,9 +176,9 @@ export default function ServicePostForm({ postId }: ServicePostFormProps) {
                   name="unit"
                   render={({ field }) => (
                     <FormItem className="sm:col-span-2">
-                      <FormLabel>Unit *</FormLabel>
+                      <FormLabel>{translations.common.unit} *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter unit" {...field} data-testid="input-post-unit" />
+                        <Input placeholder="Digite a unidade" {...field} data-testid="input-post-unit" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -189,10 +190,10 @@ export default function ServicePostForm({ postId }: ServicePostFormProps) {
                   name="description"
                   render={({ field }) => (
                     <FormItem className="sm:col-span-2">
-                      <FormLabel>Description</FormLabel>
+                      <FormLabel>{translations.common.description}</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Enter description (optional)"
+                          placeholder="Digite a descrição (opcional)"
                           rows={4}
                           {...field}
                           data-testid="input-post-description"
@@ -211,10 +212,10 @@ export default function ServicePostForm({ postId }: ServicePostFormProps) {
                   onClick={() => setLocation("/service-posts")}
                   data-testid="button-cancel"
                 >
-                  Cancel
+                  {translations.common.cancel}
                 </Button>
                 <Button type="submit" disabled={mutation.isPending} data-testid="button-submit">
-                  {mutation.isPending ? "Saving..." : isEditing ? "Update Service Post" : "Create Service Post"}
+                  {mutation.isPending ? "Salvando..." : isEditing ? translations.common.update : translations.common.save}
                 </Button>
               </div>
             </form>

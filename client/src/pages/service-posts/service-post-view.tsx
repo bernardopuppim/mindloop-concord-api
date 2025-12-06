@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDate } from "@/lib/authUtils";
+import { translations } from "@/lib/translations";
 import type { ServicePost, Allocation, Document } from "@shared/schema";
 
 interface ServicePostViewProps {
@@ -35,7 +36,7 @@ export default function ServicePostView({ postId }: ServicePostViewProps) {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Loading..." />
+        <PageHeader title={translations.common.loading} />
         <Card>
           <CardContent className="p-6">
             <div className="space-y-4">
@@ -52,12 +53,12 @@ export default function ServicePostView({ postId }: ServicePostViewProps) {
   if (!servicePost) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Service Post Not Found" />
+        <PageHeader title="Posto de Serviço Não Encontrado" />
         <Card>
           <CardContent className="p-6">
-            <p className="text-muted-foreground">The requested service post could not be found.</p>
+            <p className="text-muted-foreground">O posto de serviço solicitado não foi encontrado.</p>
             <Button asChild className="mt-4">
-              <Link href="/service-posts">Back to Service Posts</Link>
+              <Link href="/service-posts">{translations.common.back} {translations.servicePosts.title}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -69,19 +70,19 @@ export default function ServicePostView({ postId }: ServicePostViewProps) {
     <div className="space-y-6">
       <PageHeader
         title={servicePost.postName}
-        description="Service post details and allocations"
+        description="Detalhes e alocações do posto de serviço"
       >
         <Button variant="outline" asChild data-testid="button-back">
           <Link href="/service-posts">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            {translations.common.back}
           </Link>
         </Button>
         {isAdmin && (
           <Button asChild data-testid="button-edit">
             <Link href={`/service-posts/${postId}/edit`}>
               <Pencil className="h-4 w-4 mr-2" />
-              Edit
+              {translations.common.edit}
             </Link>
           </Button>
         )}
@@ -90,36 +91,36 @@ export default function ServicePostView({ postId }: ServicePostViewProps) {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Service Post Information</CardTitle>
+            <CardTitle>Informações do Posto de Serviço</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Post Code</p>
+                <p className="text-sm font-medium text-muted-foreground">{translations.servicePosts.postCode}</p>
                 <p className="text-base font-mono" data-testid="text-post-code">{servicePost.postCode}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Modality</p>
+                <p className="text-sm font-medium text-muted-foreground">{translations.servicePosts.modality}</p>
                 <div className="mt-1">
                   <StatusBadge status={servicePost.modality} />
                 </div>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Post Name</p>
+                <p className="text-sm font-medium text-muted-foreground">{translations.servicePosts.postName}</p>
                 <p className="text-base" data-testid="text-post-name">{servicePost.postName}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Unit</p>
+                <p className="text-sm font-medium text-muted-foreground">{translations.common.unit}</p>
                 <p className="text-base" data-testid="text-post-unit">{servicePost.unit}</p>
               </div>
               <div className="sm:col-span-2">
-                <p className="text-sm font-medium text-muted-foreground">Description</p>
+                <p className="text-sm font-medium text-muted-foreground">{translations.common.description}</p>
                 <p className="text-base" data-testid="text-post-description">
-                  {servicePost.description || "No description provided"}
+                  {servicePost.description || "Nenhuma descrição fornecida"}
                 </p>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Created At</p>
+                <p className="text-sm font-medium text-muted-foreground">{translations.servicePosts.createdAt}</p>
                 <p className="text-base">{servicePost.createdAt ? formatDate(servicePost.createdAt) : "N/A"}</p>
               </div>
             </div>
@@ -130,12 +131,12 @@ export default function ServicePostView({ postId }: ServicePostViewProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Documents
+              {translations.documents.title}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {postDocuments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No documents attached</p>
+              <p className="text-sm text-muted-foreground">Nenhum documento anexado</p>
             ) : (
               <div className="space-y-2">
                 {postDocuments.map((doc) => (
@@ -147,7 +148,7 @@ export default function ServicePostView({ postId }: ServicePostViewProps) {
               </div>
             )}
             <Button variant="outline" size="sm" className="mt-4 w-full" asChild>
-              <Link href={`/documents?postId=${postId}`}>View All Documents</Link>
+              <Link href={`/documents?postId=${postId}`}>Ver Todos os Documentos</Link>
             </Button>
           </CardContent>
         </Card>
@@ -157,19 +158,19 @@ export default function ServicePostView({ postId }: ServicePostViewProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Recent Allocations
+            Alocações Recentes
           </CardTitle>
         </CardHeader>
         <CardContent>
           {postAllocations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No allocations found for this post</p>
+            <p className="text-sm text-muted-foreground">Nenhuma alocação encontrada para este posto</p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {postAllocations.map((allocation) => (
                 <div key={allocation.id} className="flex items-center justify-between rounded-md border p-3">
                   <div>
                     <p className="text-sm font-medium">{formatDate(allocation.date)}</p>
-                    <p className="text-xs text-muted-foreground">Employee ID: {allocation.employeeId}</p>
+                    <p className="text-xs text-muted-foreground">ID Funcionário: {allocation.employeeId}</p>
                   </div>
                   <StatusBadge status={allocation.status} />
                 </div>
@@ -177,7 +178,7 @@ export default function ServicePostView({ postId }: ServicePostViewProps) {
             </div>
           )}
           <Button variant="outline" size="sm" className="mt-4" asChild>
-            <Link href="/allocation">View All Allocations</Link>
+            <Link href="/allocation">Ver Todas as Alocações</Link>
           </Button>
         </CardContent>
       </Card>

@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDate } from "@/lib/authUtils";
+import { translations } from "@/lib/translations";
 import type { Occurrence, Employee } from "@shared/schema";
 
 export default function OccurrencesPage() {
@@ -42,13 +43,20 @@ export default function OccurrencesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/occurrences"] });
-      toast({ title: "Success", description: "Occurrence deleted successfully" });
+      toast({ title: translations.common.success, description: translations.occurrences.occurrenceDeleted });
       setDeleteId(null);
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to delete occurrence", variant: "destructive" });
+      toast({ title: translations.common.error, description: translations.errors.deleteError, variant: "destructive" });
     },
   });
+
+  const categoryLabels: Record<string, string> = {
+    absence: translations.occurrences.absence,
+    substitution: translations.occurrences.substitution,
+    issue: translations.occurrences.issue,
+    note: translations.occurrences.note,
+  };
 
   const filteredOccurrences = occurrences?.filter((occurrence) => {
     const matchesSearch = occurrence.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -58,8 +66,8 @@ export default function OccurrencesPage() {
   }) || [];
 
   const activeFilters = [
-    categoryFilter !== "all" ? `Category: ${categoryFilter}` : null,
-    employeeFilter !== "all" ? `Employee: ${employeeMap.get(Number(employeeFilter))?.name || employeeFilter}` : null,
+    categoryFilter !== "all" ? `${translations.occurrences.category}: ${categoryLabels[categoryFilter] || categoryFilter}` : null,
+    employeeFilter !== "all" ? `${translations.occurrences.employee}: ${employeeMap.get(Number(employeeFilter))?.name || employeeFilter}` : null,
   ].filter(Boolean);
 
   const clearFilters = () => {
@@ -70,7 +78,7 @@ export default function OccurrencesPage() {
   const columns = [
     {
       key: "date",
-      header: "Date",
+      header: translations.occurrences.date,
       cell: (occurrence: Occurrence) => (
         <span data-testid={`text-occurrence-date-${occurrence.id}`}>
           {formatDate(occurrence.date)}
@@ -79,14 +87,14 @@ export default function OccurrencesPage() {
     },
     {
       key: "category",
-      header: "Category",
+      header: translations.occurrences.category,
       cell: (occurrence: Occurrence) => (
         <CategoryBadge category={occurrence.category} />
       ),
     },
     {
       key: "employee",
-      header: "Employee",
+      header: translations.occurrences.employee,
       cell: (occurrence: Occurrence) => {
         const employee = occurrence.employeeId ? employeeMap.get(occurrence.employeeId) : null;
         return (
@@ -98,7 +106,7 @@ export default function OccurrencesPage() {
     },
     {
       key: "description",
-      header: "Description",
+      header: translations.common.description,
       cell: (occurrence: Occurrence) => (
         <div className="max-w-[300px] truncate" data-testid={`text-occurrence-description-${occurrence.id}`}>
           {occurrence.description}
@@ -107,7 +115,7 @@ export default function OccurrencesPage() {
     },
     {
       key: "actions",
-      header: "Actions",
+      header: translations.common.actions,
       className: "text-right",
       cell: (occurrence: Occurrence) => (
         <div className="flex items-center justify-end gap-1">
@@ -142,8 +150,8 @@ export default function OccurrencesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Occurrences"
-        description="Track incidents, absences, and notes"
+        title={translations.occurrences.title}
+        description={translations.occurrences.pageDescription}
       >
         {isAdmin && (
           <Button
@@ -154,7 +162,7 @@ export default function OccurrencesPage() {
             data-testid="button-add-occurrence"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Add Occurrence
+            {translations.occurrences.addOccurrence}
           </Button>
         )}
       </PageHeader>
@@ -164,7 +172,7 @@ export default function OccurrencesPage() {
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search by description..."
+              placeholder={translations.occurrences.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -174,23 +182,23 @@ export default function OccurrencesPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[150px]" data-testid="select-category-filter">
-                <SelectValue placeholder="Category" />
+              <SelectTrigger className="w-[160px]" data-testid="select-category-filter">
+                <SelectValue placeholder={translations.occurrences.category} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="absence">Absence</SelectItem>
-                <SelectItem value="substitution">Substitution</SelectItem>
-                <SelectItem value="issue">Issue</SelectItem>
-                <SelectItem value="note">Note</SelectItem>
+                <SelectItem value="all">{translations.occurrences.allCategories}</SelectItem>
+                <SelectItem value="absence">{translations.occurrences.absence}</SelectItem>
+                <SelectItem value="substitution">{translations.occurrences.substitution}</SelectItem>
+                <SelectItem value="issue">{translations.occurrences.issue}</SelectItem>
+                <SelectItem value="note">{translations.occurrences.note}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
               <SelectTrigger className="w-[180px]" data-testid="select-employee-filter">
-                <SelectValue placeholder="Employee" />
+                <SelectValue placeholder={translations.occurrences.employee} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Employees</SelectItem>
+                <SelectItem value="all">{translations.occurrences.allEmployees}</SelectItem>
                 {employees?.map((emp) => (
                   <SelectItem key={emp.id} value={emp.id.toString()}>{emp.name}</SelectItem>
                 ))}
@@ -200,7 +208,7 @@ export default function OccurrencesPage() {
         </div>
         {activeFilters.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-muted-foreground">Active filters:</span>
+            <span className="text-sm text-muted-foreground">Filtros ativos:</span>
             {activeFilters.map((filter) => (
               <Badge key={filter} variant="secondary" className="text-xs">
                 {filter}
@@ -208,7 +216,7 @@ export default function OccurrencesPage() {
             ))}
             <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 px-2" data-testid="button-clear-filters">
               <X className="h-3 w-3 mr-1" />
-              Clear all
+              {translations.common.clearFilters}
             </Button>
           </div>
         )}
@@ -218,8 +226,8 @@ export default function OccurrencesPage() {
         columns={columns}
         data={filteredOccurrences}
         isLoading={isLoading}
-        emptyMessage="No occurrences found"
-        emptyDescription="Track incidents and notes here."
+        emptyMessage={translations.occurrences.noOccurrences}
+        emptyDescription="Registre incidentes e anotações aqui."
         testIdPrefix="occurrences"
       />
 
@@ -233,9 +241,9 @@ export default function OccurrencesPage() {
       <ConfirmDialog
         open={deleteId !== null}
         onOpenChange={(open) => !open && setDeleteId(null)}
-        title="Delete Occurrence"
-        description="Are you sure you want to delete this occurrence? This action cannot be undone."
-        confirmText="Delete"
+        title={translations.occurrences.deleteOccurrence}
+        description={translations.occurrences.deleteConfirm}
+        confirmText={translations.common.delete}
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
         variant="destructive"
         isLoading={deleteMutation.isPending}

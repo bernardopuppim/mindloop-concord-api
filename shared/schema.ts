@@ -15,12 +15,15 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userRoleEnum = pgEnum("user_role", ["admin", "viewer"]);
+export const userRoleEnum = pgEnum("user_role", ["admin", "admin_dica", "operator_dica", "fiscal_petrobras", "viewer"]);
 export const employeeStatusEnum = pgEnum("employee_status", ["active", "inactive"]);
 export const modalityEnum = pgEnum("modality", ["onsite", "hybrid", "remote"]);
 export const allocationStatusEnum = pgEnum("allocation_status", ["present", "absent", "justified", "vacation", "medical_leave"]);
 export const occurrenceCategoryEnum = pgEnum("occurrence_category", ["absence", "substitution", "issue", "note"]);
 export const documentTypeEnum = pgEnum("document_type", ["aso", "certification", "evidence", "contract", "other"]);
+export const documentCategoryEnum = pgEnum("document_category", ["atestados", "comprovantes", "relatorios_mensais", "evidencias_posto", "treinamentos", "certidoes", "outros"]);
+export const alertTypeEnum = pgEnum("alert_type", ["unallocated_employee", "expired_document", "untreated_occurrence"]);
+export const alertStatusEnum = pgEnum("alert_status", ["pending", "resolved"]);
 
 // Session storage table - Required for Replit Auth
 export const sessions = pgTable(
@@ -57,7 +60,7 @@ export const employees = pgTable("employees", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Service Posts table
+// Service Posts table (Anexo 1A enhanced)
 export const servicePosts = pgTable("service_posts", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   postCode: varchar("post_code", { length: 50 }).notNull().unique(),
@@ -65,6 +68,10 @@ export const servicePosts = pgTable("service_posts", {
   description: text("description"),
   unit: varchar("unit", { length: 255 }).notNull(),
   modality: modalityEnum("modality").default("onsite").notNull(),
+  tipoPosto: varchar("tipo_posto", { length: 100 }),
+  horarioTrabalho: varchar("horario_trabalho", { length: 100 }),
+  escalaRegime: varchar("escala_regime", { length: 100 }),
+  quantidadePrevista: integer("quantidade_prevista"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -81,18 +88,21 @@ export const allocations = pgTable("allocations", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Occurrences table
+// Occurrences table (enhanced with treated status)
 export const occurrences = pgTable("occurrences", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   date: date("date").notNull(),
   employeeId: integer("employee_id").references(() => employees.id, { onDelete: "set null" }),
   description: text("description").notNull(),
   category: occurrenceCategoryEnum("category").notNull(),
+  treated: boolean("treated").default(false).notNull(),
+  treatedBy: varchar("treated_by").references(() => users.id, { onDelete: "set null" }),
+  treatedAt: timestamp("treated_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Documents table
+// Documents table (Anexo 1B enhanced)
 export const documents = pgTable("documents", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   filename: varchar("filename", { length: 255 }).notNull(),
@@ -101,10 +111,12 @@ export const documents = pgTable("documents", {
   size: integer("size").notNull(),
   path: varchar("path", { length: 500 }).notNull(),
   documentType: documentTypeEnum("document_type").default("other").notNull(),
+  category: documentCategoryEnum("category").default("outros"),
   employeeId: integer("employee_id").references(() => employees.id, { onDelete: "set null" }),
   postId: integer("post_id").references(() => servicePosts.id, { onDelete: "set null" }),
   monthYear: varchar("month_year", { length: 7 }),
   expirationDate: date("expiration_date"),
+  observations: text("observations"),
   uploadedBy: varchar("uploaded_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -134,11 +146,25 @@ export const notificationSettings = pgTable("notification_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Alerts table (for workflows)
+export const alerts = pgTable("alerts", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  type: alertTypeEnum("type").notNull(),
+  status: alertStatusEnum("status").default("pending").notNull(),
+  message: text("message").notNull(),
+  entityType: varchar("entity_type", { length: 50 }),
+  entityId: integer("entity_id"),
+  resolvedBy: varchar("resolved_by").references(() => users.id, { onDelete: "set null" }),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   documents: many(documents),
   auditLogs: many(auditLogs),
   notificationSettings: many(notificationSettings),
+  resolvedAlerts: many(alerts),
 }));
 
 export const notificationSettingsRelations = relations(notificationSettings, ({ one }) => ({
@@ -175,6 +201,10 @@ export const occurrencesRelations = relations(occurrences, ({ one }) => ({
     fields: [occurrences.employeeId],
     references: [employees.id],
   }),
+  treatedByUser: one(users, {
+    fields: [occurrences.treatedBy],
+    references: [users.id],
+  }),
 }));
 
 export const documentsRelations = relations(documents, ({ one }) => ({
@@ -199,6 +229,13 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   }),
 }));
 
+export const alertsRelations = relations(alerts, ({ one }) => ({
+  resolver: one(users, {
+    fields: [alerts.resolvedBy],
+    references: [users.id],
+  }),
+}));
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -211,7 +248,7 @@ export const insertEmployeeSchema = createInsertSchema(employees).omit({
   createdAt: true,
   updatedAt: true,
 }).extend({
-  cpf: z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, "CPF must be in format XXX.XXX.XXX-XX"),
+  cpf: z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, "CPF deve estar no formato XXX.XXX.XXX-XX"),
 });
 
 export const insertServicePostSchema = createInsertSchema(servicePosts).omit({
@@ -230,6 +267,9 @@ export const insertOccurrenceSchema = createInsertSchema(occurrences).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  treated: true,
+  treatedBy: true,
+  treatedAt: true,
 });
 
 export const insertDocumentSchema = createInsertSchema(documents).omit({
@@ -246,6 +286,13 @@ export const insertNotificationSettingsSchema = createInsertSchema(notificationS
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertAlertSchema = createInsertSchema(alerts).omit({
+  id: true,
+  createdAt: true,
+  resolvedBy: true,
+  resolvedAt: true,
 });
 
 // Types
@@ -265,6 +312,8 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertNotificationSettings = z.infer<typeof insertNotificationSettingsSchema>;
 export type NotificationSettings = typeof notificationSettings.$inferSelect;
+export type InsertAlert = z.infer<typeof insertAlertSchema>;
+export type Alert = typeof alerts.$inferSelect;
 
 // Extended types with relations
 export type AllocationWithRelations = Allocation & {
@@ -274,6 +323,7 @@ export type AllocationWithRelations = Allocation & {
 
 export type OccurrenceWithRelations = Occurrence & {
   employee?: Employee | null;
+  treatedByUser?: User | null;
 };
 
 export type DocumentWithRelations = Document & {
@@ -288,4 +338,8 @@ export type AuditLogWithRelations = AuditLog & {
 
 export type NotificationSettingsWithRelations = NotificationSettings & {
   user?: User | null;
+};
+
+export type AlertWithRelations = Alert & {
+  resolver?: User | null;
 };

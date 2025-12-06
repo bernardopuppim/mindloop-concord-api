@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDate } from "@/lib/authUtils";
+import { translations } from "@/lib/translations";
 import type { Employee, Document, Allocation } from "@shared/schema";
 
 interface EmployeeViewProps {
@@ -35,7 +36,7 @@ export default function EmployeeView({ employeeId }: EmployeeViewProps) {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Loading..." />
+        <PageHeader title={translations.common.loading} />
         <Card>
           <CardContent className="p-6">
             <div className="space-y-4">
@@ -52,12 +53,12 @@ export default function EmployeeView({ employeeId }: EmployeeViewProps) {
   if (!employee) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Employee Not Found" />
+        <PageHeader title={translations.errors.notFound} />
         <Card>
           <CardContent className="p-6">
-            <p className="text-muted-foreground">The requested employee could not be found.</p>
+            <p className="text-muted-foreground">{translations.errors.notFound}</p>
             <Button asChild className="mt-4">
-              <Link href="/employees">Back to Employees</Link>
+              <Link href="/employees">{translations.common.back}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -69,19 +70,19 @@ export default function EmployeeView({ employeeId }: EmployeeViewProps) {
     <div className="space-y-6">
       <PageHeader
         title={employee.name}
-        description="Employee details and related information"
+        description={translations.employees.viewEmployee}
       >
         <Button variant="outline" asChild data-testid="button-back">
           <Link href="/employees">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            {translations.common.back}
           </Link>
         </Button>
         {isAdmin && (
           <Button asChild data-testid="button-edit">
             <Link href={`/employees/${employeeId}/edit`}>
               <Pencil className="h-4 w-4 mr-2" />
-              Edit
+              {translations.common.edit}
             </Link>
           </Button>
         )}
@@ -90,34 +91,34 @@ export default function EmployeeView({ employeeId }: EmployeeViewProps) {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Employee Information</CardTitle>
+            <CardTitle>{translations.employees.title}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Full Name</p>
+                <p className="text-sm font-medium text-muted-foreground">{translations.employees.name}</p>
                 <p className="text-base" data-testid="text-employee-name">{employee.name}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">CPF</p>
+                <p className="text-sm font-medium text-muted-foreground">{translations.employees.cpf}</p>
                 <p className="text-base font-mono" data-testid="text-employee-cpf">{employee.cpf}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Function / Post</p>
+                <p className="text-sm font-medium text-muted-foreground">{translations.employees.functionPost}</p>
                 <p className="text-base" data-testid="text-employee-function">{employee.functionPost}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Unit</p>
+                <p className="text-sm font-medium text-muted-foreground">{translations.employees.unit}</p>
                 <p className="text-base" data-testid="text-employee-unit">{employee.unit}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Status</p>
+                <p className="text-sm font-medium text-muted-foreground">{translations.employees.status}</p>
                 <div className="mt-1">
                   <StatusBadge status={employee.status} />
                 </div>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Created At</p>
+                <p className="text-sm font-medium text-muted-foreground">{translations.employees.createdAt}</p>
                 <p className="text-base">{employee.createdAt ? formatDate(employee.createdAt) : "N/A"}</p>
               </div>
             </div>
@@ -128,12 +129,12 @@ export default function EmployeeView({ employeeId }: EmployeeViewProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Documents
+              {translations.documents.title}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {employeeDocuments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No documents attached</p>
+              <p className="text-sm text-muted-foreground">{translations.documents.noDocuments}</p>
             ) : (
               <div className="space-y-2">
                 {employeeDocuments.map((doc) => (
@@ -145,7 +146,7 @@ export default function EmployeeView({ employeeId }: EmployeeViewProps) {
               </div>
             )}
             <Button variant="outline" size="sm" className="mt-4 w-full" asChild>
-              <Link href={`/documents?employeeId=${employeeId}`}>View All Documents</Link>
+              <Link href={`/documents?employeeId=${employeeId}`}>{translations.common.view} {translations.documents.title}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -155,19 +156,19 @@ export default function EmployeeView({ employeeId }: EmployeeViewProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Recent Allocations
+            {translations.allocation.title}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {employeeAllocations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No allocations found</p>
+            <p className="text-sm text-muted-foreground">{translations.allocation.noAllocations}</p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {employeeAllocations.map((allocation) => (
                 <div key={allocation.id} className="flex items-center justify-between rounded-md border p-3">
                   <div>
                     <p className="text-sm font-medium">{formatDate(allocation.date)}</p>
-                    <p className="text-xs text-muted-foreground">Post ID: {allocation.postId}</p>
+                    <p className="text-xs text-muted-foreground">{translations.servicePosts.title}: {allocation.postId}</p>
                   </div>
                   <StatusBadge status={allocation.status} />
                 </div>
@@ -175,7 +176,7 @@ export default function EmployeeView({ employeeId }: EmployeeViewProps) {
             </div>
           )}
           <Button variant="outline" size="sm" className="mt-4" asChild>
-            <Link href="/allocation">View All Allocations</Link>
+            <Link href="/allocation">{translations.common.view} {translations.allocation.title}</Link>
           </Button>
         </CardContent>
       </Card>

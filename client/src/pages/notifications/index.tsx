@@ -33,6 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { translations } from "@/lib/translations";
 import type { NotificationSettings } from "@shared/schema";
 
 interface NotificationStatus {
@@ -63,14 +64,14 @@ export default function NotificationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notification-settings"] });
-      toast({ title: "Success", description: "Notification recipient added" });
+      toast({ title: translations.common.success, description: translations.notifications.recipientAdded });
       setAddDialogOpen(false);
       setNewEmail("");
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error?.message || "Failed to add notification recipient",
+        title: translations.common.error,
+        description: error?.message || translations.notifications.addRecipientFailed,
         variant: "destructive",
       });
     },
@@ -82,10 +83,10 @@ export default function NotificationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notification-settings"] });
-      toast({ title: "Success", description: "Settings updated" });
+      toast({ title: translations.common.success, description: translations.notifications.settingsSaved });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to update settings", variant: "destructive" });
+      toast({ title: translations.common.error, description: translations.errors.saveError, variant: "destructive" });
     },
   });
 
@@ -95,10 +96,10 @@ export default function NotificationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notification-settings"] });
-      toast({ title: "Success", description: "Notification recipient removed" });
+      toast({ title: translations.common.success, description: translations.notifications.recipientRemoved });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to remove recipient", variant: "destructive" });
+      toast({ title: translations.common.error, description: translations.errors.deleteError, variant: "destructive" });
     },
   });
 
@@ -107,13 +108,13 @@ export default function NotificationsPage() {
       await apiRequest("POST", "/api/notifications/test", { email });
     },
     onSuccess: () => {
-      toast({ title: "Success", description: "Test email sent successfully" });
+      toast({ title: translations.common.success, description: translations.notifications.emailSent });
       setTestEmail("");
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error?.message || "Failed to send test email",
+        title: translations.common.error,
+        description: error?.message || translations.notifications.testEmailFailed,
         variant: "destructive",
       });
     },
@@ -126,12 +127,12 @@ export default function NotificationsPage() {
     },
     onSuccess: (data) => {
       toast({
-        title: "Success",
-        description: `Document expiration notifications sent to ${data.sentCount || 0} recipients`,
+        title: translations.common.success,
+        description: translations.notifications.documentExpirationSent.replace("{count}", String(data.sentCount || 0)),
       });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to send notifications", variant: "destructive" });
+      toast({ title: translations.common.error, description: translations.notifications.documentExpirationFailed, variant: "destructive" });
     },
   });
 
@@ -142,19 +143,19 @@ export default function NotificationsPage() {
     },
     onSuccess: (data) => {
       toast({
-        title: "Success",
-        description: `Daily summary sent to ${data.sentCount || 0} recipients`,
+        title: translations.common.success,
+        description: translations.notifications.dailySummarySent.replace("{count}", String(data.sentCount || 0)),
       });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to send daily summary", variant: "destructive" });
+      toast({ title: translations.common.error, description: translations.notifications.dailySummaryFailed, variant: "destructive" });
     },
   });
 
   if (authLoading) {
     return (
       <div className="p-6 space-y-6">
-        <PageHeader title="Email Notifications" />
+        <PageHeader title={translations.notifications.title} />
         <Card>
           <CardContent className="py-12">
             <Skeleton className="h-32 w-full" />
@@ -167,13 +168,13 @@ export default function NotificationsPage() {
   if (!isAdmin) {
     return (
       <div className="p-6 space-y-6">
-        <PageHeader title="Email Notifications" />
+        <PageHeader title={translations.notifications.title} />
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Bell className="h-12 w-12 text-muted-foreground mb-4" />
-            <h2 className="text-lg font-semibold">Access Denied</h2>
+            <h2 className="text-lg font-semibold">{translations.auth.accessDenied}</h2>
             <p className="text-muted-foreground text-center max-w-md">
-              You do not have permission to manage notification settings. Contact an administrator for assistance.
+              {translations.auth.permissionRequired}
             </p>
           </CardContent>
         </Card>
@@ -186,31 +187,31 @@ export default function NotificationsPage() {
   return (
     <div className="p-6 space-y-6">
       <PageHeader
-        title="Email Notifications"
-        description="Configure email notifications for system events"
+        title={translations.notifications.title}
+        description={translations.notifications.description}
       >
         {isAdmin && emailServiceConfigured && (
           <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-add-recipient">
                 <Plus className="h-4 w-4 mr-2" />
-                Add Recipient
+                Adicionar Destinatário
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add Notification Recipient</DialogTitle>
+                <DialogTitle>Adicionar Destinatário de Notificação</DialogTitle>
                 <DialogDescription>
-                  Add an email address to receive system notifications
+                  Adicione um endereço de email para receber notificações do sistema
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+                  <Label htmlFor="email">{translations.notifications.emailAddress}</Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="recipient@example.com"
+                    placeholder="destinatario@exemplo.com"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
                     data-testid="input-new-email"
@@ -223,14 +224,14 @@ export default function NotificationsPage() {
                   onClick={() => setAddDialogOpen(false)}
                   data-testid="button-cancel-add"
                 >
-                  Cancel
+                  {translations.common.cancel}
                 </Button>
                 <Button
                   onClick={() => createMutation.mutate(newEmail)}
                   disabled={!newEmail || createMutation.isPending}
                   data-testid="button-confirm-add"
                 >
-                  Add Recipient
+                  Adicionar Destinatário
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -242,9 +243,9 @@ export default function NotificationsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5" />
-            Email Service Status
+            Status do Serviço de Email
           </CardTitle>
-          <CardDescription>Current email service configuration status</CardDescription>
+          <CardDescription>Status da configuração do serviço de email</CardDescription>
         </CardHeader>
         <CardContent>
           {statusLoading ? (
@@ -255,16 +256,16 @@ export default function NotificationsPage() {
                 <>
                   <CheckCircle className="h-6 w-6 text-green-600" />
                   <div className="flex-1">
-                    <p className="font-medium text-green-700 dark:text-green-400">Email Service Configured</p>
-                    <p className="text-sm text-muted-foreground">SMTP connection is ready to send emails</p>
+                    <p className="font-medium text-green-700 dark:text-green-400">Serviço de Email Configurado</p>
+                    <p className="text-sm text-muted-foreground">Conexão SMTP pronta para enviar emails</p>
                   </div>
                 </>
               ) : (
                 <>
                   <XCircle className="h-6 w-6 text-amber-600" />
                   <div className="flex-1">
-                    <p className="font-medium text-amber-700 dark:text-amber-400">Email Service Not Configured</p>
-                    <p className="text-sm text-muted-foreground">SMTP credentials are missing or invalid</p>
+                    <p className="font-medium text-amber-700 dark:text-amber-400">Serviço de Email Não Configurado</p>
+                    <p className="text-sm text-muted-foreground">Credenciais SMTP ausentes ou inválidas</p>
                   </div>
                 </>
               )}
@@ -276,16 +277,16 @@ export default function NotificationsPage() {
               <div className="flex gap-3">
                 <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-medium text-amber-800 dark:text-amber-200">SMTP Configuration Required</p>
+                  <p className="font-medium text-amber-800 dark:text-amber-200">Configuração SMTP Necessária</p>
                   <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                    To enable email notifications, please configure the following environment variables:
+                    Para habilitar notificações por email, configure as seguintes variáveis de ambiente:
                   </p>
                   <ul className="mt-2 text-sm text-amber-700 dark:text-amber-300 list-disc list-inside space-y-1">
-                    <li>SMTP_HOST - Your SMTP server hostname</li>
-                    <li>SMTP_PORT - SMTP server port (usually 587 or 465)</li>
-                    <li>SMTP_USER - SMTP authentication username</li>
-                    <li>SMTP_PASS - SMTP authentication password</li>
-                    <li>SMTP_FROM (optional) - Sender email address</li>
+                    <li>SMTP_HOST - Hostname do servidor SMTP</li>
+                    <li>SMTP_PORT - Porta do servidor SMTP (geralmente 587 ou 465)</li>
+                    <li>SMTP_USER - Usuário de autenticação SMTP</li>
+                    <li>SMTP_PASS - Senha de autenticação SMTP</li>
+                    <li>SMTP_FROM (opcional) - Endereço de email do remetente</li>
                   </ul>
                 </div>
               </div>
@@ -301,18 +302,18 @@ export default function NotificationsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Send className="h-5 w-5" />
-                  Send Test Email
+                  {translations.notifications.testEmail}
                 </CardTitle>
-                <CardDescription>Test the email configuration by sending a test email</CardDescription>
+                <CardDescription>Teste a configuração de email enviando um email de teste</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="test-email">Email Address</Label>
+                    <Label htmlFor="test-email">{translations.notifications.emailAddress}</Label>
                     <Input
                       id="test-email"
                       type="email"
-                      placeholder="test@example.com"
+                      placeholder="teste@exemplo.com"
                       value={testEmail}
                       onChange={(e) => setTestEmail(e.target.value)}
                       data-testid="input-test-email"
@@ -324,7 +325,7 @@ export default function NotificationsPage() {
                     data-testid="button-send-test"
                   >
                     <Send className="h-4 w-4 mr-2" />
-                    Send Test Email
+                    Enviar Email de Teste
                   </Button>
                 </div>
               </CardContent>
@@ -334,9 +335,9 @@ export default function NotificationsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Bell className="h-5 w-5" />
-                  Manual Notifications
+                  Notificações Manuais
                 </CardTitle>
-                <CardDescription>Manually trigger notification emails</CardDescription>
+                <CardDescription>Disparar emails de notificação manualmente</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -348,7 +349,7 @@ export default function NotificationsPage() {
                     data-testid="button-send-doc-expiration"
                   >
                     <AlertTriangle className="h-4 w-4 mr-2" />
-                    Send Document Expiration Alerts
+                    Enviar Alertas de Vencimento de Documentos
                   </Button>
                   <Button
                     variant="outline"
@@ -358,7 +359,7 @@ export default function NotificationsPage() {
                     data-testid="button-send-daily-summary"
                   >
                     <Info className="h-4 w-4 mr-2" />
-                    Send Daily Summary
+                    Enviar Resumo Diário
                   </Button>
                 </div>
               </CardContent>
@@ -369,9 +370,9 @@ export default function NotificationsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Mail className="h-5 w-5" />
-                Notification Recipients
+                Destinatários de Notificação
               </CardTitle>
-              <CardDescription>Manage who receives email notifications and what types they receive</CardDescription>
+              <CardDescription>Gerencie quem recebe notificações por email e quais tipos</CardDescription>
             </CardHeader>
             <CardContent>
               {settingsLoading ? (
@@ -383,9 +384,9 @@ export default function NotificationsPage() {
               ) : settings?.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <Mail className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No notification recipients configured</p>
+                  <p className="text-muted-foreground">{translations.notifications.noPendingNotifications}</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Click "Add Recipient" to add an email address
+                    Clique em "Adicionar Destinatário" para adicionar um endereço de email
                   </p>
                 </div>
               ) : (
@@ -394,12 +395,12 @@ export default function NotificationsPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Email</TableHead>
-                        <TableHead className="text-center">Active</TableHead>
-                        <TableHead className="text-center">New Occurrences</TableHead>
-                        <TableHead className="text-center">Missing Allocations</TableHead>
-                        <TableHead className="text-center">Doc Expiration</TableHead>
-                        <TableHead className="text-center">Daily Summary</TableHead>
-                        <TableHead className="w-[80px]">Actions</TableHead>
+                        <TableHead className="text-center">{translations.notifications.isActive}</TableHead>
+                        <TableHead className="text-center">{translations.notifications.notifyNewOccurrences}</TableHead>
+                        <TableHead className="text-center">{translations.notifications.notifyMissingAllocations}</TableHead>
+                        <TableHead className="text-center">{translations.notifications.notifyDocumentExpiration}</TableHead>
+                        <TableHead className="text-center">{translations.notifications.notifyDailySummary}</TableHead>
+                        <TableHead className="w-[80px]">{translations.common.actions}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -469,18 +470,18 @@ export default function NotificationsPage() {
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
-                                  <AlertDialogTitle>Remove Recipient</AlertDialogTitle>
+                                  <AlertDialogTitle>Remover Destinatário</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    Are you sure you want to remove {setting.email} from receiving notifications?
+                                    Tem certeza que deseja remover {setting.email} da lista de notificações?
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                  <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                                  <AlertDialogCancel data-testid="button-cancel-delete">{translations.common.cancel}</AlertDialogCancel>
                                   <AlertDialogAction
                                     onClick={() => deleteMutation.mutate(setting.id)}
                                     data-testid="button-confirm-delete"
                                   >
-                                    Remove
+                                    Remover
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>

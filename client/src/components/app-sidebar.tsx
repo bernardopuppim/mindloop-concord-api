@@ -9,8 +9,8 @@ import {
   BarChart3,
   Settings,
   LogOut,
-  Building2,
   Bell,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,61 +29,85 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
+import { translations } from "@/lib/translations";
+import { DicaLogo } from "@/components/dica-logo";
 
 const mainNavItems = [
   {
-    title: "Dashboard",
+    title: translations.nav.dashboard,
     url: "/",
     icon: LayoutDashboard,
   },
   {
-    title: "Employees",
+    title: translations.nav.employees,
     url: "/employees",
     icon: Users,
   },
   {
-    title: "Service Posts",
+    title: translations.nav.servicePosts,
     url: "/service-posts",
     icon: Briefcase,
   },
   {
-    title: "Allocation",
+    title: translations.nav.allocation,
     url: "/allocation",
     icon: CalendarDays,
   },
   {
-    title: "Occurrences",
+    title: translations.nav.occurrences,
     url: "/occurrences",
     icon: AlertCircle,
   },
   {
-    title: "Documents",
+    title: translations.nav.documents,
     url: "/documents",
     icon: FileText,
+  },
+  {
+    title: translations.nav.alerts,
+    url: "/alerts",
+    icon: AlertTriangle,
   },
 ];
 
 const adminNavItems = [
   {
-    title: "Reports",
+    title: translations.nav.reports,
     url: "/reports",
     icon: BarChart3,
   },
   {
-    title: "Notifications",
+    title: translations.nav.notifications,
     url: "/notifications",
     icon: Bell,
   },
   {
-    title: "Admin Settings",
+    title: translations.nav.adminSettings,
     url: "/admin",
     icon: Settings,
   },
 ];
 
+function getRoleLabel(role?: string): string {
+  switch (role) {
+    case "admin":
+      return translations.roles.admin;
+    case "admin_dica":
+      return translations.roles.adminDica;
+    case "operator_dica":
+      return translations.roles.operatorDica;
+    case "fiscal_petrobras":
+      return translations.roles.fiscalPetrobras;
+    case "viewer":
+      return translations.roles.viewer;
+    default:
+      return translations.roles.viewer;
+  }
+}
+
 export function AppSidebar() {
   const [location] = useLocation();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, userRole } = useAuth();
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
     const first = firstName?.charAt(0) || "";
@@ -91,23 +115,23 @@ export function AppSidebar() {
     return (first + last).toUpperCase() || "U";
   };
 
+  const canViewAdminItems = isAdmin || userRole === "admin_dica" || userRole === "operator_dica";
+
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary">
-            <Building2 className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <DicaLogo className="h-10 w-10" />
           <div className="flex flex-col">
-            <span className="text-sm font-semibold">Gestao Contratual</span>
-            <span className="text-xs text-muted-foreground">Contract Management</span>
+            <span className="text-sm font-semibold">{translations.branding.appName}</span>
+            <span className="text-xs text-muted-foreground">{translations.branding.companyName}</span>
           </div>
         </div>
       </SidebarHeader>
       
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
+          <SidebarGroupLabel>{translations.nav.mainMenu}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainNavItems.map((item) => (
@@ -116,7 +140,7 @@ export function AppSidebar() {
                     asChild
                     isActive={location === item.url || (item.url !== "/" && location.startsWith(item.url))}
                   >
-                    <Link href={item.url} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
+                    <Link href={item.url} data-testid={`link-nav-${item.url.replace(/\//g, '') || 'dashboard'}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>
@@ -129,26 +153,28 @@ export function AppSidebar() {
 
         <Separator className="mx-4" />
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Administration</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {adminNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location === item.url || location.startsWith(item.url)}
-                  >
-                    <Link href={item.url} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {canViewAdminItems && (
+          <SidebarGroup>
+            <SidebarGroupLabel>{translations.nav.administration}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminNavItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location === item.url || location.startsWith(item.url)}
+                    >
+                      <Link href={item.url} data-testid={`link-nav-${item.url.replace(/\//g, '')}`}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="p-4">
@@ -162,10 +188,10 @@ export function AppSidebar() {
           </Avatar>
           <div className="flex flex-1 flex-col overflow-hidden">
             <span className="truncate text-sm font-medium">
-              {user?.firstName || user?.email || "User"}
+              {user?.firstName || user?.email || "Usuário"}
             </span>
             <Badge variant="secondary" className="w-fit text-xs">
-              {isAdmin ? "Admin" : "Viewer"}
+              {getRoleLabel(userRole)}
             </Badge>
           </div>
           <Button

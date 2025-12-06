@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { getMonthYearOptions } from "@/lib/authUtils";
+import { translations } from "@/lib/translations";
 import type { Employee, ServicePost } from "@shared/schema";
 
 interface DocumentUploadDialogProps {
@@ -32,7 +33,7 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedFile) throw new Error("No file selected");
+      if (!selectedFile) throw new Error(translations.validation.fileRequired);
 
       const formData = new FormData();
       formData.append("file", selectedFile);
@@ -58,7 +59,7 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error.message || "Upload failed");
+        throw new Error(error.message || translations.documents.uploadFailed);
       }
 
       return response.json();
@@ -67,13 +68,13 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/documents/expiring"] });
       queryClient.invalidateQueries({ queryKey: ["/api/documents/expired"] });
-      toast({ title: "Success", description: "Document uploaded successfully" });
+      toast({ title: translations.common.success, description: translations.documents.documentUploaded });
       handleClose();
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to upload document",
+        title: translations.common.error,
+        description: error.message || translations.errors.saveError,
         variant: "destructive",
       });
     },
@@ -83,7 +84,7 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        toast({ title: "Error", description: "File size must be less than 10MB", variant: "destructive" });
+        toast({ title: translations.common.error, description: translations.validation.fileTooLarge.replace("{max}", "10"), variant: "destructive" });
         return;
       }
       setSelectedFile(file);
@@ -105,7 +106,7 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
     const file = e.dataTransfer.files?.[0];
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        toast({ title: "Error", description: "File size must be less than 10MB", variant: "destructive" });
+        toast({ title: translations.common.error, description: translations.validation.fileTooLarge.replace("{max}", "10"), variant: "destructive" });
         return;
       }
       setSelectedFile(file);
@@ -116,7 +117,7 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Upload Document</DialogTitle>
+          <DialogTitle>{translations.documents.uploadDocument}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -149,8 +150,8 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
             ) : (
               <>
                 <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">Drag and drop or click to upload</p>
-                <p className="text-xs text-muted-foreground mt-1">PDF, images up to 10MB</p>
+                <p className="text-sm text-muted-foreground">{translations.common.dragDrop}</p>
+                <p className="text-xs text-muted-foreground mt-1">{translations.documents.acceptedFormats}</p>
               </>
             )}
           </div>
@@ -164,42 +165,42 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
           />
 
           <div className="space-y-2">
-            <Label>Document Type</Label>
+            <Label>{translations.documents.type}</Label>
             <Select value={documentType} onValueChange={setDocumentType}>
               <SelectTrigger data-testid="select-doc-type">
-                <SelectValue placeholder="Select type" />
+                <SelectValue placeholder={translations.common.selectOption} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="aso">ASO</SelectItem>
-                <SelectItem value="certification">Certification</SelectItem>
-                <SelectItem value="evidence">Evidence</SelectItem>
-                <SelectItem value="contract">Contract</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                <SelectItem value="aso">{translations.documents.aso}</SelectItem>
+                <SelectItem value="certification">{translations.documents.certification}</SelectItem>
+                <SelectItem value="evidence">{translations.documents.evidence}</SelectItem>
+                <SelectItem value="contract">{translations.documents.contract}</SelectItem>
+                <SelectItem value="other">{translations.documents.other}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
-            <Label>Link To</Label>
+            <Label>{translations.documents.linkTo}</Label>
             <Select value={linkType} onValueChange={(v) => { setLinkType(v); setLinkedId(""); setMonthYear(""); }}>
               <SelectTrigger data-testid="select-link-type">
-                <SelectValue placeholder="Select link type" />
+                <SelectValue placeholder={translations.common.selectOption} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                <SelectItem value="employee">Employee</SelectItem>
-                <SelectItem value="post">Service Post</SelectItem>
-                <SelectItem value="month">Monthly Evidence</SelectItem>
+                <SelectItem value="none">{translations.documents.none}</SelectItem>
+                <SelectItem value="employee">{translations.documents.employee}</SelectItem>
+                <SelectItem value="post">{translations.documents.post}</SelectItem>
+                <SelectItem value="month">{translations.documents.monthlyEvidence}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {linkType === "employee" && (
             <div className="space-y-2">
-              <Label>Select Employee</Label>
+              <Label>{translations.documents.selectEmployee}</Label>
               <Select value={linkedId} onValueChange={setLinkedId}>
                 <SelectTrigger data-testid="select-link-employee">
-                  <SelectValue placeholder="Select employee" />
+                  <SelectValue placeholder={translations.common.selectOption} />
                 </SelectTrigger>
                 <SelectContent>
                   {employees.map((emp) => (
@@ -214,10 +215,10 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
 
           {linkType === "post" && (
             <div className="space-y-2">
-              <Label>Select Service Post</Label>
+              <Label>{translations.documents.selectServicePost}</Label>
               <Select value={linkedId} onValueChange={setLinkedId}>
                 <SelectTrigger data-testid="select-link-post">
-                  <SelectValue placeholder="Select post" />
+                  <SelectValue placeholder={translations.common.selectOption} />
                 </SelectTrigger>
                 <SelectContent>
                   {servicePosts.map((post) => (
@@ -232,10 +233,10 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
 
           {linkType === "month" && (
             <div className="space-y-2">
-              <Label>Select Month</Label>
+              <Label>{translations.documents.selectMonthYear}</Label>
               <Select value={monthYear} onValueChange={setMonthYear}>
                 <SelectTrigger data-testid="select-link-month">
-                  <SelectValue placeholder="Select month" />
+                  <SelectValue placeholder={translations.common.selectOption} />
                 </SelectTrigger>
                 <SelectContent>
                   {monthYearOptions.map((opt) => (
@@ -249,7 +250,7 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
           )}
 
           <div className="space-y-2">
-            <Label>Expiration Date (Optional)</Label>
+            <Label>{translations.documents.expirationDate} ({translations.common.optional})</Label>
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -261,21 +262,21 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Set an expiration date to track document renewals
+              {translations.documents.setExpirationHint}
             </p>
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={handleClose} data-testid="button-cancel">
-            Cancel
+            {translations.common.cancel}
           </Button>
           <Button
             onClick={() => uploadMutation.mutate()}
             disabled={!selectedFile || uploadMutation.isPending}
             data-testid="button-upload"
           >
-            {uploadMutation.isPending ? "Uploading..." : "Upload"}
+            {uploadMutation.isPending ? translations.common.sending : translations.common.uploadFile}
           </Button>
         </DialogFooter>
       </DialogContent>

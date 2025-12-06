@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, subMonths } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Save, Upload, Copy, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,9 +15,18 @@ import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { translations } from "@/lib/translations";
 import type { Employee, ServicePost, Allocation } from "@shared/schema";
 
 const allocationStatuses = ["present", "absent", "justified", "vacation", "medical_leave"] as const;
+
+const statusLabels: Record<string, string> = {
+  present: translations.allocation.present,
+  absent: translations.allocation.absent,
+  justified: translations.allocation.justified,
+  vacation: translations.allocation.vacation,
+  medical_leave: translations.allocation.medicalLeave,
+};
 
 export default function AllocationPage() {
   const { isAdmin } = useAuth();
@@ -53,7 +63,7 @@ export default function AllocationPage() {
         credentials: "include",
       });
       if (!res.ok) {
-        throw new Error("Failed to fetch allocations");
+        throw new Error(translations.allocation.loadError);
       }
       return res.json();
     },
@@ -67,7 +77,7 @@ export default function AllocationPage() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!selectedPost) {
-        throw new Error("Please select a service post first");
+        throw new Error(translations.allocation.selectPostFirst);
       }
       const updates = Array.from(editedAllocations.entries()).map(([key, status]) => {
         const [employeeId, date] = key.split("_");
@@ -85,18 +95,18 @@ export default function AllocationPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/allocations"] });
-      toast({ title: "Success", description: "Allocations saved successfully" });
+      toast({ title: translations.common.success, description: translations.allocation.allocationUpdated });
       setEditedAllocations(new Map());
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to save allocations", variant: "destructive" });
+      toast({ title: translations.common.error, description: translations.errors.saveError, variant: "destructive" });
     },
   });
 
   const copyMonthMutation = useMutation({
     mutationFn: async () => {
       if (!selectedPost) {
-        throw new Error("Please select a service post first");
+        throw new Error(translations.allocation.selectPostFirst);
       }
       const response = await apiRequest("POST", "/api/allocations/copy-month", {
         sourceMonth: previousMonthStr,
@@ -108,15 +118,15 @@ export default function AllocationPage() {
     onSuccess: (data: { count: number }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/allocations"] });
       toast({ 
-        title: "Success", 
-        description: `Copied ${data.count} allocations from previous month` 
+        title: translations.common.success, 
+        description: translations.allocation.allocationsCopied.replace("{count}", String(data.count))
       });
       setCopyDialogOpen(false);
     },
     onError: (error: Error) => {
       toast({ 
-        title: "Error", 
-        description: error.message || "Failed to copy allocations", 
+        title: translations.common.error, 
+        description: error.message || translations.errors.generic, 
         variant: "destructive" 
       });
     },
@@ -125,7 +135,7 @@ export default function AllocationPage() {
   const csvImportMutation = useMutation({
     mutationFn: async (file: File) => {
       if (!selectedPost) {
-        throw new Error("Please select a service post first");
+        throw new Error(translations.allocation.selectPostFirst);
       }
       const formData = new FormData();
       formData.append("file", file);
@@ -140,18 +150,18 @@ export default function AllocationPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to import CSV");
+        throw new Error(errorData.message || translations.allocation.importCsvFailed);
       }
 
       return response.json();
     },
     onSuccess: (data: { imported: number; errors?: string[] }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/allocations"] });
-      let description = `Imported ${data.imported} allocations`;
+      let description = translations.allocation.allocationsImported.replace("{count}", String(data.imported));
       if (data.errors && data.errors.length > 0) {
-        description += `. ${data.errors.length} rows had errors.`;
+        description += `. ${translations.allocation.linesWithErrors.replace("{count}", String(data.errors.length))}`;
       }
-      toast({ title: "Success", description });
+      toast({ title: translations.common.success, description });
       setCsvDialogOpen(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -159,8 +169,8 @@ export default function AllocationPage() {
     },
     onError: (error: Error) => {
       toast({ 
-        title: "Error", 
-        description: error.message || "Failed to import CSV", 
+        title: translations.common.error, 
+        description: error.message || translations.allocation.importCsvFailed, 
         variant: "destructive" 
       });
     },
@@ -179,7 +189,7 @@ export default function AllocationPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "allocation_template.csv";
+    a.download = "modelo_alocacao.csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -219,8 +229,8 @@ export default function AllocationPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Daily Allocation"
-        description="Track employee attendance and allocations by service post"
+        title={translations.allocation.title}
+        description={translations.allocation.description}
       >
         <div className="flex flex-wrap items-center gap-2">
           {isAdmin && selectedPost && (
@@ -229,20 +239,20 @@ export default function AllocationPage() {
                 <DialogTrigger asChild>
                   <Button variant="outline" data-testid="button-import-csv">
                     <Upload className="h-4 w-4 mr-2" />
-                    Import CSV
+                    {translations.allocation.importCsv}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Import Allocations from CSV</DialogTitle>
+                    <DialogTitle>Importar Alocações via CSV</DialogTitle>
                     <DialogDescription>
-                      Upload a CSV file with columns: employee_id, date, status.
-                      Valid statuses: present, absent, justified, vacation, medical_leave.
+                      Envie um arquivo CSV com as colunas: employee_id, date, status.
+                      Status válidos: present, absent, justified, vacation, medical_leave.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="csv-file">CSV File</Label>
+                      <Label htmlFor="csv-file">Arquivo CSV</Label>
                       <Input
                         id="csv-file"
                         type="file"
@@ -260,7 +270,7 @@ export default function AllocationPage() {
                       data-testid="button-download-template"
                     >
                       <Download className="h-4 w-4 mr-2" />
-                      Download Template
+                      Baixar Modelo
                     </Button>
                   </div>
                   <DialogFooter>
@@ -269,7 +279,7 @@ export default function AllocationPage() {
                       onClick={() => setCsvDialogOpen(false)}
                       data-testid="button-cancel-csv"
                     >
-                      Cancel
+                      {translations.common.cancel}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -279,27 +289,27 @@ export default function AllocationPage() {
                 <DialogTrigger asChild>
                   <Button variant="outline" data-testid="button-copy-month">
                     <Copy className="h-4 w-4 mr-2" />
-                    Copy Previous Month
+                    {translations.allocation.copyFromMonth}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Copy Previous Month's Allocations</DialogTitle>
+                    <DialogTitle>Copiar Alocações do Mês Anterior</DialogTitle>
                     <DialogDescription>
-                      This will copy all allocations from {format(previousMonthDate, "MMMM yyyy")} to {format(currentDate, "MMMM yyyy")} for the selected service post.
-                      Existing allocations for the current month will be replaced.
+                      Isso irá copiar todas as alocações de {format(previousMonthDate, "MMMM yyyy", { locale: ptBR })} para {format(currentDate, "MMMM yyyy", { locale: ptBR })} para o posto selecionado.
+                      As alocações existentes no mês atual serão substituídas.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="py-4">
                     <div className="flex items-center gap-4 text-sm">
                       <div className="flex-1 p-3 rounded-md bg-muted">
-                        <div className="text-muted-foreground">From</div>
-                        <div className="font-medium">{format(previousMonthDate, "MMMM yyyy")}</div>
+                        <div className="text-muted-foreground">{translations.allocation.sourceMonth}</div>
+                        <div className="font-medium">{format(previousMonthDate, "MMMM yyyy", { locale: ptBR })}</div>
                       </div>
                       <ChevronRight className="h-5 w-5 text-muted-foreground" />
                       <div className="flex-1 p-3 rounded-md bg-muted">
-                        <div className="text-muted-foreground">To</div>
-                        <div className="font-medium">{format(currentDate, "MMMM yyyy")}</div>
+                        <div className="text-muted-foreground">{translations.allocation.targetMonth}</div>
+                        <div className="font-medium">{format(currentDate, "MMMM yyyy", { locale: ptBR })}</div>
                       </div>
                     </div>
                   </div>
@@ -309,14 +319,14 @@ export default function AllocationPage() {
                       onClick={() => setCopyDialogOpen(false)}
                       data-testid="button-cancel-copy"
                     >
-                      Cancel
+                      {translations.common.cancel}
                     </Button>
                     <Button
                       onClick={() => copyMonthMutation.mutate()}
                       disabled={copyMonthMutation.isPending}
                       data-testid="button-confirm-copy"
                     >
-                      {copyMonthMutation.isPending ? "Copying..." : "Copy Allocations"}
+                      {copyMonthMutation.isPending ? "Copiando..." : "Copiar Alocações"}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -326,7 +336,7 @@ export default function AllocationPage() {
           {isAdmin && editedAllocations.size > 0 && (
             <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} data-testid="button-save-allocations">
               <Save className="h-4 w-4 mr-2" />
-              {saveMutation.isPending ? "Saving..." : `Save Changes (${editedAllocations.size})`}
+              {saveMutation.isPending ? "Salvando..." : `Salvar Alterações (${editedAllocations.size})`}
             </Button>
           )}
         </div>
@@ -339,18 +349,18 @@ export default function AllocationPage() {
               <Button variant="outline" size="icon" onClick={previousMonth} data-testid="button-prev-month">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <CardTitle className="min-w-[180px] text-center">
-                {format(currentDate, "MMMM yyyy")}
+              <CardTitle className="min-w-[180px] text-center capitalize">
+                {format(currentDate, "MMMM yyyy", { locale: ptBR })}
               </CardTitle>
               <Button variant="outline" size="icon" onClick={nextMonth} data-testid="button-next-month">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Service Post:</span>
+              <span className="text-sm text-muted-foreground">Posto de Serviço:</span>
               <Select value={selectedPost} onValueChange={setSelectedPost}>
                 <SelectTrigger className="w-[200px]" data-testid="select-service-post">
-                  <SelectValue placeholder="Select a post" />
+                  <SelectValue placeholder={translations.allocation.selectPost} />
                 </SelectTrigger>
                 <SelectContent>
                   {servicePosts?.map((post) => (
@@ -366,7 +376,7 @@ export default function AllocationPage() {
         <CardContent>
           {!selectedPost ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <p className="text-muted-foreground">Select a service post to view and manage allocations</p>
+              <p className="text-muted-foreground">{translations.allocation.selectPostFirst}</p>
             </div>
           ) : isLoading ? (
             <div className="space-y-4">
@@ -376,7 +386,7 @@ export default function AllocationPage() {
             </div>
           ) : activeEmployees.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <p className="text-muted-foreground">No active employees found</p>
+              <p className="text-muted-foreground">Nenhum funcionário ativo encontrado</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -384,7 +394,7 @@ export default function AllocationPage() {
                 <thead>
                   <tr className="border-b">
                     <th className="sticky left-0 bg-background p-2 text-left text-sm font-medium min-w-[150px] z-10">
-                      Employee
+                      {translations.employees.name}
                     </th>
                     {daysInMonth.map((day) => (
                       <th
@@ -393,7 +403,7 @@ export default function AllocationPage() {
                           day.getDay() === 0 || day.getDay() === 6 ? "bg-muted/50" : ""
                         }`}
                       >
-                        <div>{format(day, "EEE")}</div>
+                        <div>{format(day, "EEE", { locale: ptBR })}</div>
                         <div className="text-muted-foreground">{format(day, "d")}</div>
                       </th>
                     ))}
@@ -425,7 +435,7 @@ export default function AllocationPage() {
                                 <SelectContent>
                                   {allocationStatuses.map((s) => (
                                     <SelectItem key={s} value={s} className="text-xs">
-                                      {s.charAt(0).toUpperCase() + s.slice(1).replace("_", " ")}
+                                      {statusLabels[s] || s}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -449,7 +459,7 @@ export default function AllocationPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Status Legend</CardTitle>
+          <CardTitle>Legenda de Status</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4">

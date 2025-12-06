@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Briefcase, CalendarDays, AlertCircle, FileText, TrendingUp, Clock, CheckCircle, BarChart3, PieChart } from "lucide-react";
 import type { Employee, ServicePost, Allocation, Occurrence, Document } from "@shared/schema";
+import { translations } from "@/lib/translations";
 import {
   AreaChart,
   Area,
@@ -16,8 +17,6 @@ import {
   Pie,
   Cell,
   Legend,
-  BarChart,
-  Bar,
 } from "recharts";
 
 interface AllocationTrend {
@@ -190,10 +189,10 @@ export default function Dashboard() {
   })) || [];
 
   const categoryLabels: Record<string, string> = {
-    absence: "Absence",
-    substitution: "Substitution",
-    issue: "Issue",
-    note: "Note",
+    absence: translations.occurrences.absence,
+    substitution: translations.occurrences.substitution,
+    issue: translations.occurrences.issue,
+    note: translations.occurrences.note,
   };
 
   const formattedCategories = occurrencesByCategory?.map(cat => ({
@@ -204,36 +203,36 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Dashboard"
-        description="Overview of your contract management system"
+        title={translations.dashboard.title}
+        description={translations.dashboard.description}
       />
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Employees"
+          title={translations.dashboard.totalEmployees}
           value={stats.totalEmployees}
-          subtitle={`${stats.activeEmployees} active`}
+          subtitle={`${stats.activeEmployees} ${translations.employees.active.toLowerCase()}s`}
           icon={Users}
           isLoading={isLoading}
         />
         <StatCard
-          title="Service Posts"
+          title={translations.dashboard.servicePosts}
           value={stats.totalPosts}
-          subtitle="Registered posts"
+          subtitle={translations.dashboard.registeredPosts}
           icon={Briefcase}
           isLoading={isLoading}
         />
         <StatCard
-          title="Today's Allocations"
+          title={translations.dashboard.todayAllocations}
           value={stats.todayAllocations}
-          subtitle={`${stats.presentToday} present`}
+          subtitle={`${stats.presentToday} ${translations.dashboard.presentToday}`}
           icon={CalendarDays}
           isLoading={isLoading}
         />
         <StatCard
-          title="Monthly Occurrences"
+          title={translations.dashboard.monthlyOccurrences}
           value={stats.monthOccurrences}
-          subtitle="This month"
+          subtitle={translations.dashboard.thisMonth}
           icon={AlertCircle}
           isLoading={isLoading}
         />
@@ -244,7 +243,7 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
-              Allocation Trends (Last 30 Days)
+              {translations.dashboard.allocationTrends} ({translations.dashboard.last30Days})
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -253,7 +252,7 @@ export default function Dashboard() {
             ) : formattedTrends.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <BarChart3 className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">No allocation data available</p>
+                <p className="text-sm text-muted-foreground">{translations.dashboard.noAllocationData}</p>
               </div>
             ) : (
               <div className="h-[250px]" data-testid="chart-allocation-trends">
@@ -288,7 +287,7 @@ export default function Dashboard() {
                       stroke={CHART_COLORS.present} 
                       fill={CHART_COLORS.present} 
                       fillOpacity={0.6}
-                      name="Present"
+                      name={translations.allocation.present}
                     />
                     <Area 
                       type="monotone" 
@@ -297,7 +296,7 @@ export default function Dashboard() {
                       stroke={CHART_COLORS.absent} 
                       fill={CHART_COLORS.absent} 
                       fillOpacity={0.6}
-                      name="Absent"
+                      name={translations.allocation.absent}
                     />
                     <Area 
                       type="monotone" 
@@ -306,7 +305,7 @@ export default function Dashboard() {
                       stroke={CHART_COLORS.vacation} 
                       fill={CHART_COLORS.vacation} 
                       fillOpacity={0.6}
-                      name="Vacation"
+                      name={translations.allocation.vacation}
                     />
                     <Area 
                       type="monotone" 
@@ -315,7 +314,7 @@ export default function Dashboard() {
                       stroke={CHART_COLORS.medical_leave} 
                       fill={CHART_COLORS.medical_leave} 
                       fillOpacity={0.6}
-                      name="Medical Leave"
+                      name={translations.allocation.medicalLeave}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -328,7 +327,7 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PieChart className="h-5 w-5" />
-              Occurrences by Category (Last 30 Days)
+              {translations.dashboard.occurrencesByCategory} ({translations.dashboard.last30Days})
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -337,7 +336,7 @@ export default function Dashboard() {
             ) : formattedCategories.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <PieChart className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">No occurrence data available</p>
+                <p className="text-sm text-muted-foreground">{translations.dashboard.noOccurrenceData}</p>
               </div>
             ) : (
               <div className="h-[250px]" data-testid="chart-occurrences-category">
@@ -379,7 +378,7 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Compliance Metrics
+              {translations.dashboard.complianceMetrics}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -393,26 +392,26 @@ export default function Dashboard() {
             ) : (
               <div className="space-y-4" data-testid="compliance-metrics">
                 <ComplianceMetricBar 
-                  label="Attendance Rate" 
+                  label={translations.dashboard.attendanceRate}
                   value={complianceMetrics?.attendanceRate || 0} 
                   color="hsl(var(--chart-1))"
                 />
                 <ComplianceMetricBar 
-                  label="Documentation Rate" 
+                  label={translations.dashboard.documentationRate}
                   value={complianceMetrics?.documentationRate || 0} 
                   color="hsl(var(--chart-2))"
                 />
                 <ComplianceMetricBar 
-                  label="Active Employee Rate" 
+                  label={translations.dashboard.activeEmployeeRate}
                   value={complianceMetrics?.activeEmployeeRate || 0} 
                   color="hsl(var(--chart-3))"
                 />
                 <div className="pt-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Occurrences per Employee</span>
+                    <span className="text-sm font-medium">{translations.dashboard.occurrencesPerEmployee}</span>
                     <span className="text-sm text-muted-foreground">{complianceMetrics?.occurrenceRate || 0}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Last 30 days average</p>
+                  <p className="text-xs text-muted-foreground mt-1">{translations.dashboard.average30Days}</p>
                 </div>
               </div>
             )}
@@ -423,7 +422,7 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Quick Stats
+              {translations.dashboard.quickStats}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -433,8 +432,8 @@ export default function Dashboard() {
                   <FileText className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Documents</p>
-                  <p className="text-xs text-muted-foreground">Total uploaded</p>
+                  <p className="text-sm font-medium">{translations.dashboard.documents}</p>
+                  <p className="text-xs text-muted-foreground">{translations.dashboard.totalUploaded}</p>
                 </div>
               </div>
               <span className="text-2xl font-semibold">{stats.totalDocuments}</span>
@@ -445,8 +444,8 @@ export default function Dashboard() {
                   <CheckCircle className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Active Rate</p>
-                  <p className="text-xs text-muted-foreground">Employee status</p>
+                  <p className="text-sm font-medium">{translations.dashboard.activeRate}</p>
+                  <p className="text-xs text-muted-foreground">{translations.dashboard.employeeStatus}</p>
                 </div>
               </div>
               <span className="text-2xl font-semibold">
@@ -461,8 +460,8 @@ export default function Dashboard() {
                   <Clock className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Attendance</p>
-                  <p className="text-xs text-muted-foreground">Today's rate</p>
+                  <p className="text-sm font-medium">{translations.dashboard.attendance}</p>
+                  <p className="text-xs text-muted-foreground">{translations.dashboard.todayRate}</p>
                 </div>
               </div>
               <span className="text-2xl font-semibold">
@@ -478,14 +477,14 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
-              Recent Occurrences
+              {translations.dashboard.recentOccurrences}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {recentOccurrences.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <AlertCircle className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">No recent occurrences</p>
+                <p className="text-sm text-muted-foreground">{translations.dashboard.noRecentOccurrences}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -499,7 +498,9 @@ export default function Dashboard() {
                       <AlertCircle className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="flex-1 overflow-hidden">
-                      <p className="text-sm font-medium truncate">{occurrence.category}</p>
+                      <p className="text-sm font-medium truncate">
+                        {categoryLabels[occurrence.category] || occurrence.category}
+                      </p>
                       <p className="text-xs text-muted-foreground truncate">{occurrence.description}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {new Date(occurrence.date).toLocaleDateString('pt-BR')}
