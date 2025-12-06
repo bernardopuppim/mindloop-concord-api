@@ -1,0 +1,136 @@
+I want you to populate the application's SQLite database with realistic sample data so that dashboards, reports, and charts can be visually evaluated.
+Please generate a full dataset appropriate for a contract management system of a medium-sized service provider.
+
+Populate the following tables with realistic, coherent, and internally consistent data:
+
+🔵 1. Employees
+
+Generate 25 employees, each with:
+
+full name
+
+CPF-like numeric value
+
+function/role
+
+unit
+
+status (active/inactive)
+
+date of admission
+
+link with service posts (if applicable)
+
+Ensure diversity: supervisors, técnicos, administrativos, auxiliares, plantonistas.
+
+🔵 2. Service Posts (Postos de Serviço)
+
+Generate 8 contract service posts, including:
+
+Código (SP001… SP008)
+
+Nome do posto
+
+Unidade
+
+Modalidade (On-site / Remoto / Híbrido)
+
+Tipo de Posto
+
+Horário de trabalho
+
+Escala / Regime
+
+Quantidade prevista no contrato
+
+🔵 3. Daily Allocations
+
+Populate 3 full months (90 days) of daily allocations.
+
+Rules:
+
+Each day, employees assigned to a post should have one attendance status
+
+Use realistic distribution:
+
+85% Presente
+
+8% Ausente
+
+4% Justificado
+
+2% Férias
+
+1% Licença médica
+
+Ensure allocations match the posts and employees
+
+Include some days with missing allocations to simulate pendências
+
+🔵 4. Occurrences
+
+Generate 40 occurrences, distributed among categories:
+
+Ausência
+
+Substituição
+
+Problema operacional
+
+Notas gerais
+
+Each must include:
+
+date
+
+description
+
+category
+
+optional employee link
+
+Spread occurrences across the last 60 days.
+
+🔵 5. Documents
+
+Generate 50 sample documents with metadata only (file paths can be placeholders), including:
+
+Categoria (Atestados, Relatórios, Evidências de Posto, Certidões, Treinamentos)
+
+Mês de referência
+
+Data de upload
+
+Employee or Post link
+
+Expiration date (some expired, some expiring soon)
+
+🔵 6. Alerts / Notifications
+
+Auto-generate pending items:
+
+documents expired
+
+documents expiring in 30 days
+
+employees without allocation
+
+occurrences marked as unresolved
+
+🔵 7. Integrity Requirements
+
+All data must respect foreign keys
+
+Dashboards must immediately show charts, counts, alerts, and trends
+
+Reports must generate meaningful content
+
+The data must be good enough for a live demonstration
+
+✔ When finished, present:
+
+Summary of how many items were inserted into each table
+
+Instructions for resetting or re-running the seed if needed
+
+Confirmation that dashboards are now populated
