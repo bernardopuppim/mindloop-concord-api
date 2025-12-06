@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
@@ -79,15 +78,19 @@ function AuditLogRow({ log }: { log: AuditLogWithUser }) {
     : "Sistema";
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+    <>
       <TableRow className="cursor-pointer" data-testid={`row-audit-${log.id}`}>
         <TableCell>
           {hasDiff ? (
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-6 w-6" data-testid={`button-expand-${log.id}`}>
-                {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </Button>
-            </CollapsibleTrigger>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6" 
+              data-testid={`button-expand-${log.id}`}
+              onClick={() => setIsOpen(!isOpen)}
+            >
+              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </Button>
           ) : (
             <div className="w-6" />
           )}
@@ -110,19 +113,17 @@ function AuditLogRow({ log }: { log: AuditLogWithUser }) {
           {log.entityId || "-"}
         </TableCell>
       </TableRow>
-      {hasDiff && (
-        <CollapsibleContent asChild>
-          <TableRow className="bg-muted/30">
-            <TableCell colSpan={6} className="py-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <DiffViewer title="Antes da alteração" data={log.diffBefore as Record<string, unknown> | null} />
-                <DiffViewer title="Depois da alteração" data={log.diffAfter as Record<string, unknown> | null} />
-              </div>
-            </TableCell>
-          </TableRow>
-        </CollapsibleContent>
+      {hasDiff && isOpen && (
+        <TableRow className="bg-muted/30">
+          <TableCell colSpan={6} className="py-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <DiffViewer title="Antes da alteração" data={log.diffBefore as Record<string, unknown> | null} />
+              <DiffViewer title="Depois da alteração" data={log.diffAfter as Record<string, unknown> | null} />
+            </div>
+          </TableCell>
+        </TableRow>
       )}
-    </Collapsible>
+    </>
   );
 }
 
