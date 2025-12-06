@@ -12,6 +12,7 @@ import {
   Bell,
   AlertTriangle,
   ClipboardList,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -86,6 +87,11 @@ const adminNavItems = [
     title: "Auditoria",
     url: "/auditoria",
     icon: ClipboardList,
+  },
+  {
+    title: "Logs LGPD",
+    url: "/lgpd-logs",
+    icon: ShieldCheck,
   },
   {
     title: translations.nav.adminSettings,

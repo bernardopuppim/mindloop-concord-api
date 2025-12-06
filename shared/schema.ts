@@ -24,6 +24,8 @@ export const documentTypeEnum = pgEnum("document_type", ["aso", "certification",
 export const documentCategoryEnum = pgEnum("document_category", ["atestados", "comprovantes", "relatorios_mensais", "evidencias_posto", "treinamentos", "certidoes", "outros"]);
 export const alertTypeEnum = pgEnum("alert_type", ["unallocated_employee", "expired_document", "untreated_occurrence"]);
 export const alertStatusEnum = pgEnum("alert_status", ["pending", "resolved"]);
+export const lgpdAccessTypeEnum = pgEnum("lgpd_access_type", ["view", "export", "search"]);
+export const lgpdDataCategoryEnum = pgEnum("lgpd_data_category", ["personal_data", "sensitive_data", "financial_data"]);
 
 // Session storage table - Required for Replit Auth
 export const sessions = pgTable(
@@ -161,12 +163,27 @@ export const alerts = pgTable("alerts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// LGPD Logs table (for data protection compliance)
+export const lgpdLogs = pgTable("lgpd_logs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  accessType: lgpdAccessTypeEnum("access_type").notNull(),
+  dataCategory: lgpdDataCategoryEnum("data_category").notNull(),
+  entityType: varchar("entity_type", { length: 100 }).notNull(),
+  entityId: varchar("entity_id", { length: 100 }),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  details: jsonb("details"),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   documents: many(documents),
   auditLogs: many(auditLogs),
   notificationSettings: many(notificationSettings),
   resolvedAlerts: many(alerts),
+  lgpdLogs: many(lgpdLogs),
 }));
 
 export const notificationSettingsRelations = relations(notificationSettings, ({ one }) => ({
@@ -238,6 +255,13 @@ export const alertsRelations = relations(alerts, ({ one }) => ({
   }),
 }));
 
+export const lgpdLogsRelations = relations(lgpdLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [lgpdLogs.userId],
+    references: [users.id],
+  }),
+}));
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -297,6 +321,11 @@ export const insertAlertSchema = createInsertSchema(alerts).omit({
   resolvedAt: true,
 });
 
+export const insertLgpdLogSchema = createInsertSchema(lgpdLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -316,6 +345,8 @@ export type InsertNotificationSettings = z.infer<typeof insertNotificationSettin
 export type NotificationSettings = typeof notificationSettings.$inferSelect;
 export type InsertAlert = z.infer<typeof insertAlertSchema>;
 export type Alert = typeof alerts.$inferSelect;
+export type InsertLgpdLog = z.infer<typeof insertLgpdLogSchema>;
+export type LgpdLog = typeof lgpdLogs.$inferSelect;
 
 // Extended types with relations
 export type AllocationWithRelations = Allocation & {
@@ -344,4 +375,8 @@ export type NotificationSettingsWithRelations = NotificationSettings & {
 
 export type AlertWithRelations = Alert & {
   resolver?: User | null;
+};
+
+export type LgpdLogWithRelations = LgpdLog & {
+  user?: User | null;
 };

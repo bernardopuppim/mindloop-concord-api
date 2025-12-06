@@ -7,6 +7,7 @@ import {
   documents,
   auditLogs,
   notificationSettings,
+  lgpdLogs,
   type User,
   type UpsertUser,
   type Employee,
@@ -28,6 +29,9 @@ import {
   type NotificationSettings,
   type InsertNotificationSettings,
   type NotificationSettingsWithRelations,
+  type LgpdLog,
+  type InsertLgpdLog,
+  type LgpdLogWithRelations,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, like, gte, lte, or, sql } from "drizzle-orm";
@@ -116,6 +120,9 @@ export interface IStorage {
   updateNotificationSettings(id: number, settings: Partial<InsertNotificationSettings>): Promise<NotificationSettings | undefined>;
   deleteNotificationSettings(id: number): Promise<boolean>;
   getActiveNotificationRecipients(notificationType: 'occurrences' | 'allocations' | 'documents' | 'daily'): Promise<string[]>;
+
+  createLgpdLog(log: InsertLgpdLog): Promise<LgpdLog>;
+  getLgpdLogsFiltered(filters?: { userId?: string; accessType?: string; dataCategory?: string; entityType?: string; startDate?: string; endDate?: string; limit?: number }): Promise<LgpdLogWithRelations[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -733,6 +740,35 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(notificationSettings.isActive, true), condition));
 
     return settings.map(s => s.email);
+  }
+
+  async createLgpdLog(log: InsertLgpdLog): Promise<LgpdLog> {
+    const [created] = await db.insert(lgpdLogs).values(log).returning();
+    return created;
+  }
+
+  async getLgpdLogsFiltered(filters?: { userId?: string; accessType?: string; dataCategory?: string; entityType?: string; startDate?: string; endDate?: string; limit?: number }): Promise<LgpdLogWithRelations[]> {
+    const conditions = [];
+    if (filters?.userId) conditions.push(eq(lgpdLogs.userId, filters.userId));
+    if (filters?.accessType) conditions.push(eq(lgpdLogs.accessType, filters.accessType as any));
+    if (filters?.dataCategory) conditions.push(eq(lgpdLogs.dataCategory, filters.dataCategory as any));
+    if (filters?.entityType) conditions.push(eq(lgpdLogs.entityType, filters.entityType));
+    if (filters?.startDate) conditions.push(gte(lgpdLogs.timestamp, new Date(filters.startDate)));
+    if (filters?.endDate) {
+      const endDate = new Date(filters.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      conditions.push(lte(lgpdLogs.timestamp, endDate));
+    }
+
+    const result = await db.query.lgpdLogs.findMany({
+      where: conditions.length > 0 ? and(...conditions) : undefined,
+      with: {
+        user: true,
+      },
+      orderBy: [desc(lgpdLogs.timestamp)],
+      limit: filters?.limit || 500,
+    });
+    return result;
   }
 }
 

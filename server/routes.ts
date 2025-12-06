@@ -60,6 +60,34 @@ async function logAction(
   }
 }
 
+async function logLgpdAccess(
+  req: any,
+  accessType: "view" | "export" | "search",
+  dataCategory: "personal_data" | "sensitive_data" | "financial_data",
+  entityType: string,
+  entityId?: string | number,
+  details?: any
+) {
+  try {
+    const userId = req.user?.claims?.sub || null;
+    const ipAddress = req.ip || req.connection?.remoteAddress || null;
+    const userAgent = req.get("User-Agent") || null;
+    
+    await storage.createLgpdLog({
+      userId,
+      accessType,
+      dataCategory,
+      entityType,
+      entityId: entityId?.toString() || null,
+      ipAddress,
+      userAgent,
+      details,
+    });
+  } catch (error) {
+    console.error("Failed to create LGPD log:", error);
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -118,12 +146,20 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/employees", isAuthenticated, async (req, res) => {
+  app.get("/api/employees", isAuthenticated, async (req: any, res) => {
     try {
       const { search } = req.query;
       const employeesList = search
         ? await storage.searchEmployees(search as string)
         : await storage.getEmployees();
+      
+      // LGPD logging for personal data access
+      if (search) {
+        await logLgpdAccess(req, "search", "personal_data", "employees_search", undefined, { searchTerm: search, resultCount: employeesList.length });
+      } else {
+        await logLgpdAccess(req, "view", "personal_data", "employees_list", undefined, { count: employeesList.length });
+      }
+      
       res.json(employeesList);
     } catch (error) {
       console.error("Error fetching employees:", error);
@@ -131,13 +167,17 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/employees/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/employees/:id", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const employee = await storage.getEmployee(id);
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
       }
+      
+      // LGPD logging for personal data access
+      await logLgpdAccess(req, "view", "personal_data", "employee", id, { employeeName: employee.name });
+      
       res.json(employee);
     } catch (error) {
       console.error("Error fetching employee:", error);
@@ -290,7 +330,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/allocations", isAuthenticated, async (req, res) => {
+  app.get("/api/allocations", isAuthenticated, async (req: any, res) => {
     try {
       const { date, employeeId, postId, startDate, endDate } = req.query;
       let allocationsList;
@@ -306,6 +346,9 @@ export async function registerRoutes(
           postId: postId ? parseInt(postId as string) : undefined,
         });
       }
+      
+      // LGPD logging for allocation data access (contains employee info)
+      await logLgpdAccess(req, "view", "personal_data", "allocations_list", undefined, { count: allocationsList.length, filters: { date, employeeId, postId, startDate, endDate } });
       res.json(allocationsList);
     } catch (error) {
       console.error("Error fetching allocations:", error);
@@ -313,13 +356,17 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/allocations/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/allocations/:id", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const allocation = await storage.getAllocation(id);
       if (!allocation) {
         return res.status(404).json({ message: "Allocation not found" });
       }
+      
+      // LGPD logging for allocation detail access
+      await logLgpdAccess(req, "view", "personal_data", "allocation", id, { employeeId: allocation.employeeId, date: allocation.date });
+      
       res.json(allocation);
     } catch (error) {
       console.error("Error fetching allocation:", error);
@@ -574,7 +621,7 @@ export async function registerRoutes(
     }
   );
 
-  app.get("/api/occurrences", isAuthenticated, async (req, res) => {
+  app.get("/api/occurrences", isAuthenticated, async (req: any, res) => {
     try {
       const { startDate, endDate, category, employeeId } = req.query;
       const occurrencesList = await storage.getOccurrences({
@@ -583,6 +630,10 @@ export async function registerRoutes(
         category: category as string | undefined,
         employeeId: employeeId ? parseInt(employeeId as string) : undefined,
       });
+      
+      // LGPD logging for occurrence data access (may contain employee info)
+      await logLgpdAccess(req, "view", "personal_data", "occurrences_list", undefined, { count: occurrencesList.length, filters: { startDate, endDate, category, employeeId } });
+      
       res.json(occurrencesList);
     } catch (error) {
       console.error("Error fetching occurrences:", error);
@@ -590,13 +641,17 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/occurrences/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/occurrences/:id", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const occurrence = await storage.getOccurrence(id);
       if (!occurrence) {
         return res.status(404).json({ message: "Occurrence not found" });
       }
+      
+      // LGPD logging for occurrence detail access
+      await logLgpdAccess(req, "view", "personal_data", "occurrence", id, { employeeId: occurrence.employeeId, date: occurrence.date });
+      
       res.json(occurrence);
     } catch (error) {
       console.error("Error fetching occurrence:", error);
@@ -657,7 +712,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/documents", isAuthenticated, async (req, res) => {
+  app.get("/api/documents", isAuthenticated, async (req: any, res) => {
     try {
       const { documentType, employeeId, postId, monthYear } = req.query;
       const documentsList = await storage.getDocuments({
@@ -666,6 +721,10 @@ export async function registerRoutes(
         postId: postId ? parseInt(postId as string) : undefined,
         monthYear: monthYear as string | undefined,
       });
+      
+      // LGPD logging for document access (may contain personal data)
+      await logLgpdAccess(req, "view", "personal_data", "documents_list", undefined, { count: documentsList.length, filters: { documentType, employeeId, postId, monthYear } });
+      
       res.json(documentsList);
     } catch (error) {
       console.error("Error fetching documents:", error);
@@ -673,10 +732,14 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/documents/expiring", isAuthenticated, async (req, res) => {
+  app.get("/api/documents/expiring", isAuthenticated, async (req: any, res) => {
     try {
       const daysAhead = req.query.days ? parseInt(req.query.days as string) : 30;
       const expiringDocs = await storage.getExpiringDocuments(daysAhead);
+      
+      // LGPD logging for expiring documents access
+      await logLgpdAccess(req, "view", "personal_data", "documents_expiring", undefined, { daysAhead, count: expiringDocs.length });
+      
       res.json(expiringDocs);
     } catch (error) {
       console.error("Error fetching expiring documents:", error);
@@ -684,9 +747,13 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/documents/expired", isAuthenticated, async (_req, res) => {
+  app.get("/api/documents/expired", isAuthenticated, async (req: any, res) => {
     try {
       const expiredDocs = await storage.getExpiredDocuments();
+      
+      // LGPD logging for expired documents access
+      await logLgpdAccess(req, "view", "personal_data", "documents_expired", undefined, { count: expiredDocs.length });
+      
       res.json(expiredDocs);
     } catch (error) {
       console.error("Error fetching expired documents:", error);
@@ -694,13 +761,17 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/documents/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/documents/:id", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const document = await storage.getDocument(id);
       if (!document) {
         return res.status(404).json({ message: "Document not found" });
       }
+      
+      // LGPD logging for document access
+      await logLgpdAccess(req, "view", "personal_data", "document", id, { filename: document.originalName, documentType: document.documentType });
+      
       res.json(document);
     } catch (error) {
       console.error("Error fetching document:", error);
@@ -746,7 +817,7 @@ export async function registerRoutes(
     }
   );
 
-  app.get("/api/documents/:id/download", isAuthenticated, async (req, res) => {
+  app.get("/api/documents/:id/download", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const document = await storage.getDocument(id);
@@ -757,6 +828,9 @@ export async function registerRoutes(
       if (!fs.existsSync(document.path)) {
         return res.status(404).json({ message: "File not found" });
       }
+      
+      // LGPD logging for document download (export of personal data)
+      await logLgpdAccess(req, "export", "personal_data", "document_download", id, { filename: document.originalName, documentType: document.documentType });
 
       res.download(document.path, document.originalName);
     } catch (error) {
@@ -1089,7 +1163,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/audit-logs/export", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/admin/audit-logs/export", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const { userId, entityType, action, startDate, endDate } = req.query;
       const logs = await storage.getAuditLogsFiltered({
@@ -1100,6 +1174,9 @@ export async function registerRoutes(
         endDate: endDate as string | undefined,
         limit: 10000,
       });
+
+      // LGPD logging for audit log export
+      await logLgpdAccess(req, "export", "sensitive_data", "audit_logs_export", undefined, { count: logs.length, filters: { userId, entityType, action, startDate, endDate } });
 
       const csvHeader = "ID,Data/Hora,Usuário,Ação,Entidade,ID Entidade,Detalhes\n";
       const csvRows = logs.map(log => {
@@ -1135,6 +1212,95 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching actions:", error);
       res.status(500).json({ message: "Failed to fetch actions" });
+    }
+  });
+
+  // Admin LGPD Logs Routes
+  app.get("/api/admin/lgpd-logs", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { userId, accessType, dataCategory, entityType, startDate, endDate, limit } = req.query;
+      const logs = await storage.getLgpdLogsFiltered({
+        userId: userId as string | undefined,
+        accessType: accessType as string | undefined,
+        dataCategory: dataCategory as string | undefined,
+        entityType: entityType as string | undefined,
+        startDate: startDate as string | undefined,
+        endDate: endDate as string | undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching LGPD logs:", error);
+      res.status(500).json({ message: "Failed to fetch LGPD logs" });
+    }
+  });
+
+  app.get("/api/admin/lgpd-logs/export", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { userId, accessType, dataCategory, entityType, startDate, endDate } = req.query;
+      const logs = await storage.getLgpdLogsFiltered({
+        userId: userId as string | undefined,
+        accessType: accessType as string | undefined,
+        dataCategory: dataCategory as string | undefined,
+        entityType: entityType as string | undefined,
+        startDate: startDate as string | undefined,
+        endDate: endDate as string | undefined,
+        limit: 10000,
+      });
+
+      // LGPD logging for LGPD logs export (meta-logging)
+      await logLgpdAccess(req, "export", "sensitive_data", "lgpd_logs_export", undefined, { count: logs.length, filters: { userId, accessType, dataCategory, entityType, startDate, endDate } });
+
+      const csvHeader = "ID,Data/Hora,Usuário,Tipo de Acesso,Categoria de Dados,Entidade,ID Entidade,Endereço IP,Detalhes\n";
+      const csvRows = logs.map(log => {
+        const timestamp = log.timestamp ? new Date(log.timestamp).toLocaleString('pt-BR') : '';
+        const userName = log.user ? `${log.user.firstName || ''} ${log.user.lastName || ''}`.trim() : 'Sistema';
+        const details = log.details ? JSON.stringify(log.details).replace(/"/g, '""') : '';
+        return `${log.id},"${timestamp}","${userName}","${log.accessType}","${log.dataCategory}","${log.entityType}","${log.entityId || ''}","${log.ipAddress || ''}","${details}"`;
+      }).join("\n");
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=lgpd_logs_${new Date().toISOString().split('T')[0]}.csv`);
+      res.send('\uFEFF' + csvHeader + csvRows);
+    } catch (error) {
+      console.error("Error exporting LGPD logs:", error);
+      res.status(500).json({ message: "Failed to export LGPD logs" });
+    }
+  });
+
+  app.get("/api/admin/lgpd-logs/access-types", isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      const accessTypes = ["view", "export", "search"];
+      res.json(accessTypes);
+    } catch (error) {
+      console.error("Error fetching access types:", error);
+      res.status(500).json({ message: "Failed to fetch access types" });
+    }
+  });
+
+  app.get("/api/admin/lgpd-logs/data-categories", isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      const dataCategories = ["personal_data", "sensitive_data", "financial_data"];
+      res.json(dataCategories);
+    } catch (error) {
+      console.error("Error fetching data categories:", error);
+      res.status(500).json({ message: "Failed to fetch data categories" });
+    }
+  });
+
+  app.get("/api/admin/lgpd-logs/entity-types", isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      const entityTypes = [
+        "employee", "employees_list", "employees_search",
+        "allocation", "allocations_list",
+        "occurrence", "occurrences_list",
+        "document", "documents_list", "document_download", "documents_expiring", "documents_expired",
+        "audit_logs_export", "lgpd_logs_export"
+      ];
+      res.json(entityTypes);
+    } catch (error) {
+      console.error("Error fetching entity types:", error);
+      res.status(500).json({ message: "Failed to fetch entity types" });
     }
   });
 

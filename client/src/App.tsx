@@ -26,6 +26,7 @@ import Reports from "@/pages/reports";
 import Notifications from "@/pages/notifications/index";
 import Admin from "@/pages/admin";
 import Auditoria from "@/pages/auditoria";
+import LgpdLogs from "@/pages/lgpd-logs";
 
 function AuthenticatedRouter() {
   return (
@@ -46,6 +47,7 @@ function AuthenticatedRouter() {
       <Route path="/notifications" component={Notifications} />
       <Route path="/admin" component={Admin} />
       <Route path="/auditoria" component={Auditoria} />
+      <Route path="/lgpd-logs" component={LgpdLogs} />
       <Route component={NotFound} />
     </Switch>
   );
