@@ -9,6 +9,7 @@ import {
   notificationSettings,
   lgpdLogs,
   documentChecklists,
+  feriasLicencas,
   type User,
   type UpsertUser,
   type Employee,
@@ -36,6 +37,9 @@ import {
   type DocumentChecklist,
   type InsertDocumentChecklist,
   type DocumentChecklistWithRelations,
+  type FeriasLicencas,
+  type InsertFeriasLicencas,
+  type FeriasLicencasWithRelations,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, like, gte, lte, or, sql } from "drizzle-orm";
@@ -160,6 +164,14 @@ export interface IStorage {
   // Document Version Tracking
   getDocumentVersions(documentId: number): Promise<DocumentWithRelations[]>;
   createDocumentVersion(originalDocId: number, newDocument: InsertDocument): Promise<Document>;
+
+  // Férias & Licenças
+  getFeriasLicencas(filters?: { employeeId?: number; type?: string; status?: string }): Promise<FeriasLicencasWithRelations[]>;
+  getFeriasLicenca(id: number): Promise<FeriasLicencasWithRelations | undefined>;
+  createFeriasLicenca(data: InsertFeriasLicencas): Promise<FeriasLicencas>;
+  updateFeriasLicenca(id: number, data: Partial<InsertFeriasLicencas>): Promise<FeriasLicencas | undefined>;
+  deleteFeriasLicenca(id: number): Promise<boolean>;
+  getActiveFeriasLicencas(): Promise<FeriasLicencasWithRelations[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -991,6 +1003,74 @@ export class DatabaseStorage implements IStorage {
     }).returning();
     
     return created;
+  }
+
+  // Férias & Licenças
+  async getFeriasLicencas(filters?: { employeeId?: number; type?: string; status?: string }): Promise<FeriasLicencasWithRelations[]> {
+    const conditions = [];
+    if (filters?.employeeId) conditions.push(eq(feriasLicencas.employeeId, filters.employeeId));
+    if (filters?.type) conditions.push(eq(feriasLicencas.type, filters.type as any));
+    if (filters?.status) conditions.push(eq(feriasLicencas.status, filters.status as any));
+
+    const result = await db.query.feriasLicencas.findMany({
+      where: conditions.length > 0 ? and(...conditions) : undefined,
+      with: {
+        employee: true,
+        createdByUser: true,
+      },
+      orderBy: [desc(feriasLicencas.startDate)],
+    });
+    return result;
+  }
+
+  async getFeriasLicenca(id: number): Promise<FeriasLicencasWithRelations | undefined> {
+    const result = await db.query.feriasLicencas.findFirst({
+      where: eq(feriasLicencas.id, id),
+      with: {
+        employee: true,
+        createdByUser: true,
+      },
+    });
+    return result;
+  }
+
+  async createFeriasLicenca(data: InsertFeriasLicencas): Promise<FeriasLicencas> {
+    const [created] = await db.insert(feriasLicencas).values(data).returning();
+    return created;
+  }
+
+  async updateFeriasLicenca(id: number, data: Partial<InsertFeriasLicencas>): Promise<FeriasLicencas | undefined> {
+    const [updated] = await db
+      .update(feriasLicencas)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(feriasLicencas.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFeriasLicenca(id: number): Promise<boolean> {
+    const result = await db.delete(feriasLicencas).where(eq(feriasLicencas.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getActiveFeriasLicencas(): Promise<FeriasLicencasWithRelations[]> {
+    const today = new Date().toISOString().split('T')[0];
+    const result = await db.query.feriasLicencas.findMany({
+      where: and(
+        lte(feriasLicencas.startDate, today),
+        gte(feriasLicencas.endDate, today),
+        or(
+          eq(feriasLicencas.status, 'aprovado'),
+          eq(feriasLicencas.status, 'em_andamento')
+        )
+      ),
+      with: {
+        employee: true,
+        createdByUser: true,
+      },
+      orderBy: [feriasLicencas.endDate],
+    });
+    return result;
   }
 }
 

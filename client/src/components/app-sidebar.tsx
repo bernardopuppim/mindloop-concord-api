@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   ClipboardList,
   ShieldCheck,
+  CalendarCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -54,6 +55,11 @@ const mainNavItems = [
     title: translations.nav.allocation,
     url: "/allocation",
     icon: CalendarDays,
+  },
+  {
+    title: translations.nav.feriasLicencas,
+    url: "/ferias-licencas",
+    icon: CalendarCheck,
   },
   {
     title: translations.nav.occurrences,

@@ -27,6 +27,8 @@ import Notifications from "@/pages/notifications/index";
 import Admin from "@/pages/admin";
 import Auditoria from "@/pages/auditoria";
 import LgpdLogs from "@/pages/lgpd-logs";
+import FeriasLicencasIndex from "@/pages/ferias-licencas/index";
+import AlertsIndex from "@/pages/alerts/index";
 
 function AuthenticatedRouter() {
   return (
@@ -48,6 +50,8 @@ function AuthenticatedRouter() {
       <Route path="/admin" component={Admin} />
       <Route path="/auditoria" component={Auditoria} />
       <Route path="/lgpd-logs" component={LgpdLogs} />
+      <Route path="/ferias-licencas" component={FeriasLicencasIndex} />
+      <Route path="/alerts" component={AlertsIndex} />
       <Route component={NotFound} />
     </Switch>
   );

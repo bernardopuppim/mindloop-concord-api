@@ -9,6 +9,7 @@ import {
   insertOccurrenceSchema,
   insertNotificationSettingsSchema,
   insertDocumentChecklistSchema,
+  insertFeriasLicencasSchema,
 } from "@shared/schema";
 import { emailService } from "./emailService";
 import multer from "multer";
@@ -1478,6 +1479,219 @@ export async function registerRoutes(
       }
     }
   );
+
+  // Férias & Licenças Routes
+  app.get("/api/ferias-licencas", isAuthenticated, async (req: any, res) => {
+    try {
+      const { employeeId, type, status } = req.query;
+      const feriasLicencas = await storage.getFeriasLicencas({
+        employeeId: employeeId ? parseInt(employeeId as string) : undefined,
+        type: type as string | undefined,
+        status: status as string | undefined,
+      });
+      
+      await logLgpdAccess(req, "view", "personal_data", "ferias_licencas_list", undefined, { count: feriasLicencas.length });
+      res.json(feriasLicencas);
+    } catch (error) {
+      console.error("Error fetching férias/licenças:", error);
+      res.status(500).json({ message: "Failed to fetch férias/licenças" });
+    }
+  });
+
+  app.get("/api/ferias-licencas/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const feriasLicenca = await storage.getFeriasLicenca(id);
+      if (!feriasLicenca) {
+        return res.status(404).json({ message: "Férias/Licença not found" });
+      }
+      
+      await logLgpdAccess(req, "view", "personal_data", "ferias_licenca", id, { employeeId: feriasLicenca.employeeId });
+      res.json(feriasLicenca);
+    } catch (error) {
+      console.error("Error fetching férias/licença:", error);
+      res.status(500).json({ message: "Failed to fetch férias/licença" });
+    }
+  });
+
+  function getLeaveAllocationStatus(type: string): "vacation" | "medical_leave" {
+    switch (type) {
+      case "ferias":
+        return "vacation";
+      case "licenca_medica":
+      case "licenca_maternidade":
+      case "licenca_paternidade":
+      case "licenca_nojo":
+      case "licenca_casamento":
+      case "outros":
+      default:
+        return "medical_leave";
+    }
+  }
+
+  async function syncAllocationStatusForVacation(
+    employeeId: number,
+    startDate: string,
+    endDate: string,
+    type: string,
+    status: string
+  ) {
+    const allocationStatus = getLeaveAllocationStatus(type);
+    const shouldApply = status === "aprovado" || status === "em_andamento";
+    
+    const allocations = await storage.getAllocationsByDateRange(startDate, endDate);
+    const employeeAllocations = allocations.filter(a => a.employeeId === employeeId);
+    
+    for (const allocation of employeeAllocations) {
+      if (shouldApply) {
+        await storage.updateAllocation(allocation.id, { status: allocationStatus });
+      } else {
+        await storage.updateAllocation(allocation.id, { status: "present" });
+      }
+    }
+  }
+
+  function validateDateRange(startDate: string, endDate: string): boolean {
+    return new Date(startDate) <= new Date(endDate);
+  }
+
+  app.post("/api/ferias-licencas", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const parsed = insertFeriasLicencasSchema.safeParse({
+        ...req.body,
+        createdBy: req.user?.claims?.sub || null,
+      });
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+      }
+      
+      if (!validateDateRange(parsed.data.startDate, parsed.data.endDate)) {
+        return res.status(400).json({ message: "Data de início deve ser anterior ou igual à data de término" });
+      }
+      
+      const feriasLicenca = await storage.createFeriasLicenca(parsed.data);
+      
+      if (feriasLicenca.status === "aprovado" || feriasLicenca.status === "em_andamento") {
+        await syncAllocationStatusForVacation(
+          feriasLicenca.employeeId,
+          feriasLicenca.startDate,
+          feriasLicenca.endDate,
+          feriasLicenca.type,
+          feriasLicenca.status
+        );
+      }
+      
+      await logAction(req.user?.claims?.sub, "create", "ferias_licenca", feriasLicenca.id, { 
+        employeeId: feriasLicenca.employeeId, 
+        type: feriasLicenca.type,
+        startDate: feriasLicenca.startDate,
+        endDate: feriasLicenca.endDate,
+      });
+      res.status(201).json(feriasLicenca);
+    } catch (error) {
+      console.error("Error creating férias/licença:", error);
+      res.status(500).json({ message: "Failed to create férias/licença" });
+    }
+  });
+
+  app.patch("/api/ferias-licencas/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const before = await storage.getFeriasLicenca(id);
+      if (!before) {
+        return res.status(404).json({ message: "Férias/Licença not found" });
+      }
+      
+      const updateSchema = insertFeriasLicencasSchema.partial().omit({ createdBy: true });
+      const parsed = updateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+      }
+      
+      const startDate = parsed.data.startDate || before.startDate;
+      const endDate = parsed.data.endDate || before.endDate;
+      if (!validateDateRange(startDate, endDate)) {
+        return res.status(400).json({ message: "Data de início deve ser anterior ou igual à data de término" });
+      }
+      
+      const feriasLicenca = await storage.updateFeriasLicenca(id, parsed.data);
+      if (!feriasLicenca) {
+        return res.status(404).json({ message: "Férias/Licença not found" });
+      }
+      
+      const beforeWasActive = before.status === "aprovado" || before.status === "em_andamento";
+      const afterIsActive = feriasLicenca.status === "aprovado" || feriasLicenca.status === "em_andamento";
+      
+      if (beforeWasActive && !afterIsActive) {
+        await syncAllocationStatusForVacation(
+          before.employeeId,
+          before.startDate,
+          before.endDate,
+          before.type,
+          "pendente"
+        );
+      }
+      
+      if (afterIsActive) {
+        await syncAllocationStatusForVacation(
+          feriasLicenca.employeeId,
+          feriasLicenca.startDate,
+          feriasLicenca.endDate,
+          feriasLicenca.type,
+          feriasLicenca.status
+        );
+      }
+      
+      await logAction(req.user?.claims?.sub, "update", "ferias_licenca", id, parsed.data, before, feriasLicenca);
+      res.json(feriasLicenca);
+    } catch (error) {
+      console.error("Error updating férias/licença:", error);
+      res.status(500).json({ message: "Failed to update férias/licença" });
+    }
+  });
+
+  app.delete("/api/ferias-licencas/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const before = await storage.getFeriasLicenca(id);
+      if (!before) {
+        return res.status(404).json({ message: "Férias/Licença not found" });
+      }
+      
+      if (before.status === "aprovado" || before.status === "em_andamento") {
+        await syncAllocationStatusForVacation(
+          before.employeeId,
+          before.startDate,
+          before.endDate,
+          before.type,
+          "pendente"
+        );
+      }
+      
+      const deleted = await storage.deleteFeriasLicenca(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Férias/Licença not found" });
+      }
+      await logAction(req.user?.claims?.sub, "delete", "ferias_licenca", id, null, before, null);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting férias/licença:", error);
+      res.status(500).json({ message: "Failed to delete férias/licença" });
+    }
+  });
+
+  app.get("/api/dashboard/vacations-leaves", isAuthenticated, async (_req, res) => {
+    try {
+      const activeFeriasLicencas = await storage.getActiveFeriasLicencas();
+      res.json({
+        total: activeFeriasLicencas.length,
+        items: activeFeriasLicencas,
+      });
+    } catch (error) {
+      console.error("Error fetching active vacations/leaves:", error);
+      res.status(500).json({ message: "Failed to fetch active vacations/leaves" });
+    }
+  });
 
   return httpServer;
 }

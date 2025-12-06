@@ -26,6 +26,22 @@ export const alertTypeEnum = pgEnum("alert_type", ["unallocated_employee", "expi
 export const alertStatusEnum = pgEnum("alert_status", ["pending", "resolved"]);
 export const lgpdAccessTypeEnum = pgEnum("lgpd_access_type", ["view", "export", "search"]);
 export const lgpdDataCategoryEnum = pgEnum("lgpd_data_category", ["personal_data", "sensitive_data", "financial_data"]);
+export const feriasLicencasTypeEnum = pgEnum("ferias_licencas_type", [
+  "ferias", 
+  "licenca_medica", 
+  "licenca_maternidade", 
+  "licenca_paternidade", 
+  "licenca_nojo", 
+  "licenca_casamento",
+  "outros"
+]);
+export const feriasLicencasStatusEnum = pgEnum("ferias_licencas_status", [
+  "pendente", 
+  "aprovado", 
+  "rejeitado", 
+  "em_andamento", 
+  "concluido"
+]);
 
 // Session storage table - Required for Replit Auth
 export const sessions = pgTable(
@@ -191,6 +207,20 @@ export const lgpdLogs = pgTable("lgpd_logs", {
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
+// Férias e Licenças table
+export const feriasLicencas = pgTable("ferias_licencas", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  employeeId: integer("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  type: feriasLicencasTypeEnum("type").notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  status: feriasLicencasStatusEnum("status").default("pendente").notNull(),
+  observations: text("observations"),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   documents: many(documents),
@@ -211,6 +241,7 @@ export const employeesRelations = relations(employees, ({ many }) => ({
   allocations: many(allocations),
   occurrences: many(occurrences),
   documents: many(documents),
+  feriasLicencas: many(feriasLicencas),
 }));
 
 export const servicePostsRelations = relations(servicePosts, ({ many }) => ({
@@ -280,6 +311,17 @@ export const alertsRelations = relations(alerts, ({ one }) => ({
 export const lgpdLogsRelations = relations(lgpdLogs, ({ one }) => ({
   user: one(users, {
     fields: [lgpdLogs.userId],
+    references: [users.id],
+  }),
+}));
+
+export const feriasLicencasRelations = relations(feriasLicencas, ({ one }) => ({
+  employee: one(employees, {
+    fields: [feriasLicencas.employeeId],
+    references: [employees.id],
+  }),
+  createdByUser: one(users, {
+    fields: [feriasLicencas.createdBy],
     references: [users.id],
   }),
 }));
@@ -354,6 +396,12 @@ export const insertDocumentChecklistSchema = createInsertSchema(documentChecklis
   updatedAt: true,
 });
 
+export const insertFeriasLicencasSchema = createInsertSchema(feriasLicencas).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -414,4 +462,12 @@ export type DocumentChecklist = typeof documentChecklists.$inferSelect;
 
 export type DocumentChecklistWithRelations = DocumentChecklist & {
   post?: ServicePost | null;
+};
+
+export type InsertFeriasLicencas = z.infer<typeof insertFeriasLicencasSchema>;
+export type FeriasLicencas = typeof feriasLicencas.$inferSelect;
+
+export type FeriasLicencasWithRelations = FeriasLicencas & {
+  employee?: Employee | null;
+  createdByUser?: User | null;
 };
