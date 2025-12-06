@@ -10,6 +10,8 @@ import {
   insertNotificationSettingsSchema,
   insertDocumentChecklistSchema,
   insertFeriasLicencasSchema,
+  insertServiceActivitySchema,
+  insertActivityExecutionSchema,
 } from "@shared/schema";
 import { emailService } from "./emailService";
 import multer from "multer";
@@ -1690,6 +1692,347 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching active vacations/leaves:", error);
       res.status(500).json({ message: "Failed to fetch active vacations/leaves" });
+    }
+  });
+
+  // ============================================================
+  // Service Activities Routes
+  // ============================================================
+
+  app.get("/api/service-activities", isAuthenticated, async (req, res) => {
+    try {
+      const { postId } = req.query;
+      const activities = await storage.getServiceActivities(
+        postId ? parseInt(postId as string) : undefined
+      );
+      res.json(activities);
+    } catch (error) {
+      console.error("Error fetching service activities:", error);
+      res.status(500).json({ message: "Failed to fetch service activities" });
+    }
+  });
+
+  app.get("/api/service-activities/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const activity = await storage.getServiceActivity(id);
+      if (!activity) {
+        return res.status(404).json({ message: "Service activity not found" });
+      }
+      res.json(activity);
+    } catch (error) {
+      console.error("Error fetching service activity:", error);
+      res.status(500).json({ message: "Failed to fetch service activity" });
+    }
+  });
+
+  app.post("/api/service-activities", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const parsed = insertServiceActivitySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+      }
+      const activity = await storage.createServiceActivity(parsed.data);
+      await logAction(req.user?.claims?.sub, "create", "service_activity", activity.id, { 
+        name: activity.name,
+        servicePostId: activity.servicePostId,
+      });
+      res.status(201).json(activity);
+    } catch (error) {
+      console.error("Error creating service activity:", error);
+      res.status(500).json({ message: "Failed to create service activity" });
+    }
+  });
+
+  app.patch("/api/service-activities/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const before = await storage.getServiceActivity(id);
+      if (!before) {
+        return res.status(404).json({ message: "Service activity not found" });
+      }
+      const activity = await storage.updateServiceActivity(id, req.body);
+      if (!activity) {
+        return res.status(404).json({ message: "Service activity not found" });
+      }
+      await logAction(req.user?.claims?.sub, "update", "service_activity", id, req.body, before, activity);
+      res.json(activity);
+    } catch (error) {
+      console.error("Error updating service activity:", error);
+      res.status(500).json({ message: "Failed to update service activity" });
+    }
+  });
+
+  app.delete("/api/service-activities/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const before = await storage.getServiceActivity(id);
+      if (!before) {
+        return res.status(404).json({ message: "Service activity not found" });
+      }
+      const deleted = await storage.deleteServiceActivity(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Service activity not found" });
+      }
+      await logAction(req.user?.claims?.sub, "delete", "service_activity", id, null, before, null);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting service activity:", error);
+      res.status(500).json({ message: "Failed to delete service activity" });
+    }
+  });
+
+  // ============================================================
+  // Activity Executions Routes
+  // ============================================================
+
+  app.get("/api/activity-executions", isAuthenticated, async (req, res) => {
+    try {
+      const { servicePostId, serviceActivityId, employeeId, startDate, endDate } = req.query;
+      const executions = await storage.getActivityExecutions({
+        servicePostId: servicePostId ? parseInt(servicePostId as string) : undefined,
+        serviceActivityId: serviceActivityId ? parseInt(serviceActivityId as string) : undefined,
+        employeeId: employeeId ? parseInt(employeeId as string) : undefined,
+        startDate: startDate as string | undefined,
+        endDate: endDate as string | undefined,
+      });
+      res.json(executions);
+    } catch (error) {
+      console.error("Error fetching activity executions:", error);
+      res.status(500).json({ message: "Failed to fetch activity executions" });
+    }
+  });
+
+  app.get("/api/activity-executions/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const execution = await storage.getActivityExecution(id);
+      if (!execution) {
+        return res.status(404).json({ message: "Activity execution not found" });
+      }
+      res.json(execution);
+    } catch (error) {
+      console.error("Error fetching activity execution:", error);
+      res.status(500).json({ message: "Failed to fetch activity execution" });
+    }
+  });
+
+  app.post("/api/activity-executions", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const parsed = insertActivityExecutionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+      }
+      const execution = await storage.createActivityExecution(parsed.data);
+      await logAction(req.user?.claims?.sub, "create", "activity_execution", execution.id, { 
+        serviceActivityId: execution.serviceActivityId,
+        date: execution.date,
+        quantity: execution.quantity,
+      });
+      res.status(201).json(execution);
+    } catch (error) {
+      console.error("Error creating activity execution:", error);
+      res.status(500).json({ message: "Failed to create activity execution" });
+    }
+  });
+
+  app.post("/api/activity-executions/bulk", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { executions } = req.body;
+      if (!Array.isArray(executions) || executions.length === 0) {
+        return res.status(400).json({ message: "Executions array is required" });
+      }
+      
+      const validatedExecutions = [];
+      for (const exec of executions) {
+        const parsed = insertActivityExecutionSchema.safeParse(exec);
+        if (!parsed.success) {
+          return res.status(400).json({ 
+            message: "Invalid data in executions array", 
+            errors: parsed.error.errors 
+          });
+        }
+        validatedExecutions.push(parsed.data);
+      }
+      
+      const created = await storage.bulkUpsertActivityExecutions(validatedExecutions);
+      await logAction(req.user?.claims?.sub, "bulk_upsert", "activity_execution", undefined, { 
+        count: created.length,
+      });
+      res.status(201).json({ message: "Executions saved successfully", count: created.length, executions: created });
+    } catch (error) {
+      console.error("Error bulk upserting activity executions:", error);
+      res.status(500).json({ message: "Failed to save activity executions" });
+    }
+  });
+
+  app.patch("/api/activity-executions/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const before = await storage.getActivityExecution(id);
+      if (!before) {
+        return res.status(404).json({ message: "Activity execution not found" });
+      }
+      const execution = await storage.updateActivityExecution(id, req.body);
+      if (!execution) {
+        return res.status(404).json({ message: "Activity execution not found" });
+      }
+      await logAction(req.user?.claims?.sub, "update", "activity_execution", id, req.body, before, execution);
+      res.json(execution);
+    } catch (error) {
+      console.error("Error updating activity execution:", error);
+      res.status(500).json({ message: "Failed to update activity execution" });
+    }
+  });
+
+  app.delete("/api/activity-executions/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const before = await storage.getActivityExecution(id);
+      if (!before) {
+        return res.status(404).json({ message: "Activity execution not found" });
+      }
+      const deleted = await storage.deleteActivityExecution(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Activity execution not found" });
+      }
+      await logAction(req.user?.claims?.sub, "delete", "activity_execution", id, null, before, null);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting activity execution:", error);
+      res.status(500).json({ message: "Failed to delete activity execution" });
+    }
+  });
+
+  // ============================================================
+  // Activity Execution Attachments Routes
+  // ============================================================
+
+  app.get("/api/activity-executions/:id/attachments", isAuthenticated, async (req, res) => {
+    try {
+      const executionId = parseInt(req.params.id);
+      const attachments = await storage.getActivityExecutionAttachments(executionId);
+      res.json(attachments);
+    } catch (error) {
+      console.error("Error fetching activity execution attachments:", error);
+      res.status(500).json({ message: "Failed to fetch attachments" });
+    }
+  });
+
+  app.post(
+    "/api/activity-executions/:id/attachments",
+    isAuthenticated,
+    isAdmin,
+    upload.single("file"),
+    async (req: any, res) => {
+      try {
+        const executionId = parseInt(req.params.id);
+        
+        const execution = await storage.getActivityExecution(executionId);
+        if (!execution) {
+          if (req.file) {
+            fs.unlinkSync(req.file.path);
+          }
+          return res.status(404).json({ message: "Activity execution not found" });
+        }
+        
+        if (!req.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+        
+        const attachment = await storage.createActivityExecutionAttachment({
+          activityExecutionId: executionId,
+          fileName: req.file.originalname,
+          filePath: req.file.path,
+          mimeType: req.file.mimetype,
+        });
+        
+        await logAction(req.user?.claims?.sub, "create", "activity_execution_attachment", attachment.id, {
+          activityExecutionId: executionId,
+          fileName: attachment.fileName,
+        });
+        
+        res.status(201).json(attachment);
+      } catch (error) {
+        console.error("Error uploading attachment:", error);
+        if (req.file) {
+          try {
+            fs.unlinkSync(req.file.path);
+          } catch (e) {
+            console.error("Failed to delete file after error:", e);
+          }
+        }
+        res.status(500).json({ message: "Failed to upload attachment" });
+      }
+    }
+  );
+
+  app.get("/api/activity-execution-attachments/:id/download", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const attachment = await storage.getActivityExecutionAttachment(id);
+      if (!attachment) {
+        return res.status(404).json({ message: "Attachment not found" });
+      }
+      
+      if (!fs.existsSync(attachment.filePath)) {
+        return res.status(404).json({ message: "File not found on server" });
+      }
+      
+      res.download(attachment.filePath, attachment.fileName);
+    } catch (error) {
+      console.error("Error downloading attachment:", error);
+      res.status(500).json({ message: "Failed to download attachment" });
+    }
+  });
+
+  app.delete("/api/activity-execution-attachments/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const attachment = await storage.getActivityExecutionAttachment(id);
+      if (!attachment) {
+        return res.status(404).json({ message: "Attachment not found" });
+      }
+      
+      if (fs.existsSync(attachment.filePath)) {
+        fs.unlinkSync(attachment.filePath);
+      }
+      
+      const deleted = await storage.deleteActivityExecutionAttachment(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Attachment not found" });
+      }
+      
+      await logAction(req.user?.claims?.sub, "delete", "activity_execution_attachment", id, null, attachment, null);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting attachment:", error);
+      res.status(500).json({ message: "Failed to delete attachment" });
+    }
+  });
+
+  // ============================================================
+  // Activity Execution Reports
+  // ============================================================
+
+  app.get("/api/reports/activity-execution", isAuthenticated, async (req, res) => {
+    try {
+      const { startDate, endDate, servicePostId } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "startDate and endDate are required" });
+      }
+      
+      const report = await storage.getActivityExecutionReport({
+        startDate: startDate as string,
+        endDate: endDate as string,
+        servicePostId: servicePostId ? parseInt(servicePostId as string) : undefined,
+      });
+      
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching activity execution report:", error);
+      res.status(500).json({ message: "Failed to fetch report" });
     }
   });
 
