@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Plus, Eye, Pencil, Trash2, Search } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, Search, Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
@@ -17,6 +19,8 @@ export default function ServicePostsPage() {
   const { isAdmin } = useAuth();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [modalityFilter, setModalityFilter] = useState<string>("all");
+  const [unitFilter, setUnitFilter] = useState<string>("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const { data: servicePosts, isLoading } = useQuery<ServicePost[]>({
@@ -37,12 +41,31 @@ export default function ServicePostsPage() {
     },
   });
 
-  const filteredPosts = servicePosts?.filter(
-    (post) =>
+  const uniqueUnits = useMemo(() => {
+    const units = new Set<string>();
+    servicePosts?.forEach(p => units.add(p.unit));
+    return Array.from(units).sort();
+  }, [servicePosts]);
+
+  const filteredPosts = servicePosts?.filter((post) => {
+    const matchesSearch = 
       post.postName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       post.postCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.unit.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+      post.unit.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesModality = modalityFilter === "all" || post.modality === modalityFilter;
+    const matchesUnit = unitFilter === "all" || post.unit === unitFilter;
+    return matchesSearch && matchesModality && matchesUnit;
+  }) || [];
+
+  const activeFilters = [
+    modalityFilter !== "all" ? `Modality: ${modalityFilter}` : null,
+    unitFilter !== "all" ? `Unit: ${unitFilter}` : null,
+  ].filter(Boolean);
+
+  const clearFilters = () => {
+    setModalityFilter("all");
+    setUnitFilter("all");
+  };
 
   const columns = [
     {
@@ -124,17 +147,58 @@ export default function ServicePostsPage() {
         )}
       </PageHeader>
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, code, or unit..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-            data-testid="input-search-posts"
-          />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, code, or unit..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-posts"
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Select value={modalityFilter} onValueChange={setModalityFilter}>
+              <SelectTrigger className="w-[130px]" data-testid="select-modality-filter">
+                <SelectValue placeholder="Modality" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Modalities</SelectItem>
+                <SelectItem value="onsite">Onsite</SelectItem>
+                <SelectItem value="hybrid">Hybrid</SelectItem>
+                <SelectItem value="remote">Remote</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={unitFilter} onValueChange={setUnitFilter}>
+              <SelectTrigger className="w-[150px]" data-testid="select-unit-filter">
+                <SelectValue placeholder="Unit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Units</SelectItem>
+                {uniqueUnits.map((unit) => (
+                  <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+        {activeFilters.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-muted-foreground">Active filters:</span>
+            {activeFilters.map((filter) => (
+              <Badge key={filter} variant="secondary" className="text-xs">
+                {filter}
+              </Badge>
+            ))}
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 px-2" data-testid="button-clear-filters">
+              <X className="h-3 w-3 mr-1" />
+              Clear all
+            </Button>
+          </div>
+        )}
       </div>
 
       <DataTable

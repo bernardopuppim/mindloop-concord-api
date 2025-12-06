@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Download, Trash2, Search, Filter, FileText, Image, File, Eye } from "lucide-react";
+import { Plus, Download, Trash2, Search, Filter, FileText, Image, File, Eye, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
@@ -29,6 +30,8 @@ export default function DocumentsPage() {
   const [location] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [employeeFilter, setEmployeeFilter] = useState<string>("all");
+  const [postFilter, setPostFilter] = useState<string>("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
 
@@ -68,10 +71,24 @@ export default function DocumentsPage() {
   const filteredDocuments = documents?.filter((doc) => {
     const matchesSearch = doc.originalName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === "all" || doc.documentType === typeFilter;
-    const matchesEmployee = !employeeIdParam || doc.employeeId?.toString() === employeeIdParam;
-    const matchesPost = !postIdParam || doc.postId?.toString() === postIdParam;
-    return matchesSearch && matchesType && matchesEmployee && matchesPost;
+    const matchesEmployeeUrl = !employeeIdParam || doc.employeeId?.toString() === employeeIdParam;
+    const matchesPostUrl = !postIdParam || doc.postId?.toString() === postIdParam;
+    const matchesEmployeeFilter = employeeFilter === "all" || doc.employeeId?.toString() === employeeFilter;
+    const matchesPostFilter = postFilter === "all" || doc.postId?.toString() === postFilter;
+    return matchesSearch && matchesType && matchesEmployeeUrl && matchesPostUrl && matchesEmployeeFilter && matchesPostFilter;
   }) || [];
+
+  const activeFilters = [
+    typeFilter !== "all" ? `Type: ${typeFilter}` : null,
+    employeeFilter !== "all" ? `Employee: ${employeeMap.get(Number(employeeFilter))?.name || employeeFilter}` : null,
+    postFilter !== "all" ? `Post: ${postMap.get(Number(postFilter))?.postName || postFilter}` : null,
+  ].filter(Boolean);
+
+  const clearFilters = () => {
+    setTypeFilter("all");
+    setEmployeeFilter("all");
+    setPostFilter("all");
+  };
 
   const columns = [
     {
@@ -175,33 +192,71 @@ export default function DocumentsPage() {
         )}
       </PageHeader>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by filename..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-            data-testid="input-search-documents"
-          />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by filename..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-documents"
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-[150px]" data-testid="select-type-filter">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="aso">ASO</SelectItem>
+                <SelectItem value="certification">Certification</SelectItem>
+                <SelectItem value="evidence">Evidence</SelectItem>
+                <SelectItem value="contract">Contract</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
+              <SelectTrigger className="w-[180px]" data-testid="select-employee-filter">
+                <SelectValue placeholder="Employee" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Employees</SelectItem>
+                {employees?.map((emp) => (
+                  <SelectItem key={emp.id} value={emp.id.toString()}>{emp.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={postFilter} onValueChange={setPostFilter}>
+              <SelectTrigger className="w-[180px]" data-testid="select-post-filter">
+                <SelectValue placeholder="Service Post" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Posts</SelectItem>
+                {servicePosts?.map((post) => (
+                  <SelectItem key={post.id} value={post.id.toString()}>{post.postCode} - {post.postName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[150px]" data-testid="select-type-filter">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="aso">ASO</SelectItem>
-              <SelectItem value="certification">Certification</SelectItem>
-              <SelectItem value="evidence">Evidence</SelectItem>
-              <SelectItem value="contract">Contract</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {activeFilters.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-muted-foreground">Active filters:</span>
+            {activeFilters.map((filter) => (
+              <Badge key={filter} variant="secondary" className="text-xs">
+                {filter}
+              </Badge>
+            ))}
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 px-2" data-testid="button-clear-filters">
+              <X className="h-3 w-3 mr-1" />
+              Clear all
+            </Button>
+          </div>
+        )}
       </div>
 
       <DataTable
