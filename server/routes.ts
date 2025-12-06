@@ -8,6 +8,7 @@ import {
   insertAllocationSchema,
   insertOccurrenceSchema,
   insertNotificationSettingsSchema,
+  insertDocumentChecklistSchema,
 } from "@shared/schema";
 import { emailService } from "./emailService";
 import multer from "multer";
@@ -1324,6 +1325,159 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to fetch previsto-realizado report" });
     }
   });
+
+  // Document Checklists Routes
+  app.get("/api/document-checklists", isAuthenticated, async (req, res) => {
+    try {
+      const { postId } = req.query;
+      const checklists = await storage.getDocumentChecklists(
+        postId ? parseInt(postId as string) : undefined
+      );
+      res.json(checklists);
+    } catch (error) {
+      console.error("Error fetching document checklists:", error);
+      res.status(500).json({ message: "Failed to fetch document checklists" });
+    }
+  });
+
+  app.get("/api/document-checklists/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const checklist = await storage.getDocumentChecklist(id);
+      if (!checklist) {
+        return res.status(404).json({ message: "Document checklist not found" });
+      }
+      res.json(checklist);
+    } catch (error) {
+      console.error("Error fetching document checklist:", error);
+      res.status(500).json({ message: "Failed to fetch document checklist" });
+    }
+  });
+
+  app.post("/api/document-checklists", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const parsed = insertDocumentChecklistSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+      }
+      const checklist = await storage.createDocumentChecklist(parsed.data);
+      await logAction(req.user?.claims?.sub, "create", "document_checklist", checklist.id, { name: checklist.name, postId: checklist.postId });
+      res.status(201).json(checklist);
+    } catch (error) {
+      console.error("Error creating document checklist:", error);
+      res.status(500).json({ message: "Failed to create document checklist" });
+    }
+  });
+
+  app.patch("/api/document-checklists/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const before = await storage.getDocumentChecklist(id);
+      if (!before) {
+        return res.status(404).json({ message: "Document checklist not found" });
+      }
+      const checklist = await storage.updateDocumentChecklist(id, req.body);
+      if (!checklist) {
+        return res.status(404).json({ message: "Document checklist not found" });
+      }
+      await logAction(req.user?.claims?.sub, "update", "document_checklist", id, req.body, before, checklist);
+      res.json(checklist);
+    } catch (error) {
+      console.error("Error updating document checklist:", error);
+      res.status(500).json({ message: "Failed to update document checklist" });
+    }
+  });
+
+  app.delete("/api/document-checklists/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const before = await storage.getDocumentChecklist(id);
+      if (!before) {
+        return res.status(404).json({ message: "Document checklist not found" });
+      }
+      const deleted = await storage.deleteDocumentChecklist(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Document checklist not found" });
+      }
+      await logAction(req.user?.claims?.sub, "delete", "document_checklist", id, null, before, null);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting document checklist:", error);
+      res.status(500).json({ message: "Failed to delete document checklist" });
+    }
+  });
+
+  app.get("/api/service-posts/:id/checklist-compliance", isAuthenticated, async (req, res) => {
+    try {
+      const postId = parseInt(req.params.id);
+      const compliance = await storage.getChecklistComplianceByPost(postId);
+      res.json(compliance);
+    } catch (error) {
+      console.error("Error fetching checklist compliance:", error);
+      res.status(500).json({ message: "Failed to fetch checklist compliance" });
+    }
+  });
+
+  // Document Version Tracking Routes
+  app.get("/api/documents/:id/versions", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const versions = await storage.getDocumentVersions(id);
+      res.json(versions);
+    } catch (error) {
+      console.error("Error fetching document versions:", error);
+      res.status(500).json({ message: "Failed to fetch document versions" });
+    }
+  });
+
+  app.post(
+    "/api/documents/:id/new-version",
+    isAuthenticated,
+    isAdmin,
+    upload.single("file"),
+    async (req: any, res) => {
+      try {
+        const originalDocId = parseInt(req.params.id);
+        const originalDoc = await storage.getDocument(originalDocId);
+        if (!originalDoc) {
+          if (req.file) fs.unlinkSync(req.file.path);
+          return res.status(404).json({ message: "Original document not found" });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const newDocument = await storage.createDocumentVersion(originalDocId, {
+          filename: req.file.filename,
+          originalName: req.file.originalname,
+          mimeType: req.file.mimetype,
+          size: req.file.size,
+          path: req.file.path,
+          documentType: originalDoc.documentType,
+          employeeId: originalDoc.employeeId,
+          postId: originalDoc.postId,
+          monthYear: originalDoc.monthYear,
+          expirationDate: req.body.expirationDate || originalDoc.expirationDate,
+          observations: req.body.observations || originalDoc.observations,
+          uploadedBy: req.user?.claims?.sub || null,
+        });
+
+        await logAction(req.user?.claims?.sub, "create_version", "document", newDocument.id, {
+          previousVersionId: originalDocId,
+          version: newDocument.version,
+        });
+
+        res.status(201).json(newDocument);
+      } catch (error) {
+        console.error("Error creating document version:", error);
+        if (req.file && fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+        res.status(500).json({ message: "Failed to create document version" });
+      }
+    }
+  );
 
   return httpServer;
 }

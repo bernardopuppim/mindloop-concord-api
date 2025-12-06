@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Download, Trash2, Search, Filter, FileText, Image, File, Eye, X, AlertTriangle, Clock, Calendar } from "lucide-react";
+import { Plus, Download, Trash2, Search, Filter, FileText, Image, File, Eye, X, AlertTriangle, Clock, Calendar, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { DocTypeBadge } from "@/components/status-badge";
@@ -84,6 +85,18 @@ export default function DocumentsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
+  const [versionHistoryDocId, setVersionHistoryDocId] = useState<number | null>(null);
+
+  const { data: documentVersions, isLoading: isLoadingVersions } = useQuery<Document[]>({
+    queryKey: ["/api/documents", versionHistoryDocId, "versions"],
+    queryFn: async () => {
+      if (!versionHistoryDocId) return [];
+      const res = await fetch(`/api/documents/${versionHistoryDocId}/versions`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch versions");
+      return res.json();
+    },
+    enabled: !!versionHistoryDocId,
+  });
 
   const params = new URLSearchParams(location.split("?")[1] || "");
   const employeeIdParam = params.get("employeeId");
@@ -199,6 +212,15 @@ export default function DocumentsPage() {
       ),
     },
     {
+      key: "version",
+      header: "Versão",
+      cell: (doc: Document) => (
+        <Badge variant="outline" className="text-xs">
+          v{(doc as any).version || 1}
+        </Badge>
+      ),
+    },
+    {
       key: "expiration",
       header: translations.documents.expirationDate,
       cell: (doc: Document) => <ExpirationBadge expirationDate={(doc as any).expirationDate} />,
@@ -228,6 +250,16 @@ export default function DocumentsPage() {
               <Download className="h-4 w-4" />
             </a>
           </Button>
+          {(doc as any).version > 1 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setVersionHistoryDocId(doc.id)}
+              data-testid={`button-history-doc-${doc.id}`}
+            >
+              <History className="h-4 w-4" />
+            </Button>
+          )}
           {isAdmin && (
             <Button
               variant="ghost"
@@ -441,6 +473,39 @@ export default function DocumentsPage() {
         employees={employees || []}
         servicePosts={servicePosts || []}
       />
+
+      <Dialog open={versionHistoryDocId !== null} onOpenChange={(open) => !open && setVersionHistoryDocId(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Histórico de Versões</DialogTitle>
+            <DialogDescription>Versões anteriores deste documento</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {isLoadingVersions ? (
+              <div className="text-center py-4 text-muted-foreground">Carregando...</div>
+            ) : documentVersions?.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">Nenhuma versão anterior</div>
+            ) : (
+              documentVersions?.map((ver) => (
+                <div key={ver.id} className="flex items-center justify-between gap-2 p-3 border rounded-md">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline">v{(ver as any).version}</Badge>
+                    <div>
+                      <div className="font-medium text-sm">{ver.originalName}</div>
+                      <div className="text-xs text-muted-foreground">{ver.createdAt ? formatDate(ver.createdAt) : "N/A"}</div>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" asChild>
+                    <a href={`/api/documents/${ver.id}/download`} download>
+                      <Download className="h-4 w-4" />
+                    </a>
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={deleteId !== null}

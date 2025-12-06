@@ -8,6 +8,7 @@ import {
   auditLogs,
   notificationSettings,
   lgpdLogs,
+  documentChecklists,
   type User,
   type UpsertUser,
   type Employee,
@@ -32,6 +33,9 @@ import {
   type LgpdLog,
   type InsertLgpdLog,
   type LgpdLogWithRelations,
+  type DocumentChecklist,
+  type InsertDocumentChecklist,
+  type DocumentChecklistWithRelations,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, like, gte, lte, or, sql } from "drizzle-orm";
@@ -140,6 +144,22 @@ export interface IStorage {
       realizado: number;
     }>;
   }>;
+
+  // Document Checklists
+  getDocumentChecklists(postId?: number): Promise<DocumentChecklistWithRelations[]>;
+  getDocumentChecklist(id: number): Promise<DocumentChecklistWithRelations | undefined>;
+  createDocumentChecklist(checklist: InsertDocumentChecklist): Promise<DocumentChecklist>;
+  updateDocumentChecklist(id: number, checklist: Partial<InsertDocumentChecklist>): Promise<DocumentChecklist | undefined>;
+  deleteDocumentChecklist(id: number): Promise<boolean>;
+  getChecklistComplianceByPost(postId: number): Promise<{
+    checklist: DocumentChecklist;
+    fulfilled: boolean;
+    latestDocument: Document | null;
+  }[]>;
+
+  // Document Version Tracking
+  getDocumentVersions(documentId: number): Promise<DocumentWithRelations[]>;
+  createDocumentVersion(originalDocId: number, newDocument: InsertDocument): Promise<Document>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -861,6 +881,116 @@ export class DatabaseStorage implements IStorage {
         realizado: Number(row.realizado),
       })),
     };
+  }
+
+  // Document Checklists
+  async getDocumentChecklists(postId?: number): Promise<DocumentChecklistWithRelations[]> {
+    const conditions = postId ? [eq(documentChecklists.postId, postId)] : [];
+    const result = await db.query.documentChecklists.findMany({
+      where: conditions.length > 0 ? and(...conditions) : undefined,
+      with: {
+        post: true,
+      },
+      orderBy: [documentChecklists.name],
+    });
+    return result;
+  }
+
+  async getDocumentChecklist(id: number): Promise<DocumentChecklistWithRelations | undefined> {
+    const result = await db.query.documentChecklists.findFirst({
+      where: eq(documentChecklists.id, id),
+      with: {
+        post: true,
+      },
+    });
+    return result;
+  }
+
+  async createDocumentChecklist(checklist: InsertDocumentChecklist): Promise<DocumentChecklist> {
+    const [created] = await db.insert(documentChecklists).values(checklist).returning();
+    return created;
+  }
+
+  async updateDocumentChecklist(id: number, checklist: Partial<InsertDocumentChecklist>): Promise<DocumentChecklist | undefined> {
+    const [updated] = await db
+      .update(documentChecklists)
+      .set({ ...checklist, updatedAt: new Date() })
+      .where(eq(documentChecklists.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDocumentChecklist(id: number): Promise<boolean> {
+    const result = await db.delete(documentChecklists).where(eq(documentChecklists.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getChecklistComplianceByPost(postId: number): Promise<{
+    checklist: DocumentChecklist;
+    fulfilled: boolean;
+    latestDocument: Document | null;
+  }[]> {
+    const checklists = await db.select().from(documentChecklists).where(eq(documentChecklists.postId, postId));
+    const today = new Date().toISOString().split('T')[0];
+    
+    const results = await Promise.all(checklists.map(async (checklist) => {
+      const [latestDoc] = await db
+        .select()
+        .from(documents)
+        .where(
+          and(
+            eq(documents.postId, postId),
+            eq(documents.documentType, checklist.documentType)
+          )
+        )
+        .orderBy(desc(documents.createdAt))
+        .limit(1);
+      
+      const fulfilled = latestDoc !== undefined && 
+        (!latestDoc.expirationDate || latestDoc.expirationDate >= today);
+      
+      return {
+        checklist,
+        fulfilled,
+        latestDocument: latestDoc || null,
+      };
+    }));
+    
+    return results;
+  }
+
+  // Document Version Tracking
+  async getDocumentVersions(documentId: number): Promise<DocumentWithRelations[]> {
+    const doc = await this.getDocument(documentId);
+    if (!doc) return [];
+    
+    const versions: DocumentWithRelations[] = [doc];
+    let currentPreviousId: number | null = doc.previousVersionId;
+    
+    while (currentPreviousId) {
+      const prevDoc = await this.getDocument(currentPreviousId);
+      if (!prevDoc) break;
+      versions.push(prevDoc);
+      currentPreviousId = prevDoc.previousVersionId;
+    }
+    
+    return versions;
+  }
+
+  async createDocumentVersion(originalDocId: number, newDocument: InsertDocument): Promise<Document> {
+    const originalDoc = await this.getDocument(originalDocId);
+    if (!originalDoc) {
+      throw new Error("Original document not found");
+    }
+    
+    const newVersion = (originalDoc.version || 1) + 1;
+    const [created] = await db.insert(documents).values({
+      ...newDocument,
+      version: newVersion,
+      previousVersionId: originalDocId,
+    }).returning();
+    
+    return created;
   }
 }
 

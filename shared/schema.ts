@@ -104,7 +104,7 @@ export const occurrences = pgTable("occurrences", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Documents table (Anexo 1B enhanced)
+// Documents table (Anexo 1B enhanced with version tracking)
 export const documents = pgTable("documents", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   filename: varchar("filename", { length: 255 }).notNull(),
@@ -120,7 +120,21 @@ export const documents = pgTable("documents", {
   expirationDate: date("expiration_date"),
   observations: text("observations"),
   uploadedBy: varchar("uploaded_by").references(() => users.id, { onDelete: "set null" }),
+  version: integer("version").default(1).notNull(),
+  previousVersionId: integer("previous_version_id"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Document Checklists table (required documents per posto)
+export const documentChecklists = pgTable("document_checklists", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  postId: integer("post_id").notNull().references(() => servicePosts.id, { onDelete: "cascade" }),
+  documentType: documentTypeEnum("document_type").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  isRequired: boolean("is_required").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Audit Logs table (enhanced with diff tracking)
@@ -202,6 +216,14 @@ export const employeesRelations = relations(employees, ({ many }) => ({
 export const servicePostsRelations = relations(servicePosts, ({ many }) => ({
   allocations: many(allocations),
   documents: many(documents),
+  checklists: many(documentChecklists),
+}));
+
+export const documentChecklistsRelations = relations(documentChecklists, ({ one }) => ({
+  post: one(servicePosts, {
+    fields: [documentChecklists.postId],
+    references: [servicePosts.id],
+  }),
 }));
 
 export const allocationsRelations = relations(allocations, ({ one }) => ({
@@ -326,6 +348,12 @@ export const insertLgpdLogSchema = createInsertSchema(lgpdLogs).omit({
   timestamp: true,
 });
 
+export const insertDocumentChecklistSchema = createInsertSchema(documentChecklists).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -379,4 +407,11 @@ export type AlertWithRelations = Alert & {
 
 export type LgpdLogWithRelations = LgpdLog & {
   user?: User | null;
+};
+
+export type InsertDocumentChecklist = z.infer<typeof insertDocumentChecklistSchema>;
+export type DocumentChecklist = typeof documentChecklists.$inferSelect;
+
+export type DocumentChecklistWithRelations = DocumentChecklist & {
+  post?: ServicePost | null;
 };
