@@ -79,6 +79,27 @@ export interface IStorage {
     totalDocuments: number;
     recentOccurrences: number;
   }>;
+
+  getAllocationTrends(days?: number): Promise<Array<{
+    date: string;
+    present: number;
+    absent: number;
+    justified: number;
+    vacation: number;
+    medical_leave: number;
+  }>>;
+
+  getOccurrencesByCategory(): Promise<Array<{
+    category: string;
+    count: number;
+  }>>;
+
+  getComplianceMetrics(): Promise<{
+    attendanceRate: number;
+    documentationRate: number;
+    activeEmployeeRate: number;
+    occurrenceRate: number;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -435,6 +456,123 @@ export class DatabaseStorage implements IStorage {
       totalServicePosts: Number(postStats?.count) || 0,
       totalDocuments: Number(docStats?.count) || 0,
       recentOccurrences: Number(occurrenceStats?.count) || 0,
+    };
+  }
+
+  async getAllocationTrends(days: number = 30): Promise<Array<{
+    date: string;
+    present: number;
+    absent: number;
+    justified: number;
+    vacation: number;
+    medical_leave: number;
+  }>> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    const startDateStr = startDate.toISOString().split('T')[0];
+
+    const result = await db
+      .select({
+        date: allocations.date,
+        present: sql<number>`count(*) filter (where ${allocations.status} = 'present')`,
+        absent: sql<number>`count(*) filter (where ${allocations.status} = 'absent')`,
+        justified: sql<number>`count(*) filter (where ${allocations.status} = 'justified')`,
+        vacation: sql<number>`count(*) filter (where ${allocations.status} = 'vacation')`,
+        medical_leave: sql<number>`count(*) filter (where ${allocations.status} = 'medical_leave')`,
+      })
+      .from(allocations)
+      .where(gte(allocations.date, startDateStr))
+      .groupBy(allocations.date)
+      .orderBy(allocations.date);
+
+    return result.map(row => ({
+      date: row.date,
+      present: Number(row.present) || 0,
+      absent: Number(row.absent) || 0,
+      justified: Number(row.justified) || 0,
+      vacation: Number(row.vacation) || 0,
+      medical_leave: Number(row.medical_leave) || 0,
+    }));
+  }
+
+  async getOccurrencesByCategory(): Promise<Array<{
+    category: string;
+    count: number;
+  }>> {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const startDateStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+    const result = await db
+      .select({
+        category: occurrences.category,
+        count: sql<number>`count(*)`,
+      })
+      .from(occurrences)
+      .where(gte(occurrences.date, startDateStr))
+      .groupBy(occurrences.category);
+
+    return result.map(row => ({
+      category: row.category,
+      count: Number(row.count) || 0,
+    }));
+  }
+
+  async getComplianceMetrics(): Promise<{
+    attendanceRate: number;
+    documentationRate: number;
+    activeEmployeeRate: number;
+    occurrenceRate: number;
+  }> {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const startDateStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+    const [allocationStats] = await db
+      .select({
+        total: sql<number>`count(*)`,
+        present: sql<number>`count(*) filter (where ${allocations.status} = 'present')`,
+      })
+      .from(allocations)
+      .where(gte(allocations.date, startDateStr));
+
+    const [employeeStats] = await db
+      .select({
+        total: sql<number>`count(*)`,
+        active: sql<number>`count(*) filter (where ${employees.status} = 'active')`,
+      })
+      .from(employees);
+
+    const [docStats] = await db
+      .select({
+        employeesWithDocs: sql<number>`count(distinct ${documents.employeeId})`,
+      })
+      .from(documents);
+
+    const [occurrenceStats] = await db
+      .select({
+        count: sql<number>`count(*)`,
+      })
+      .from(occurrences)
+      .where(gte(occurrences.date, startDateStr));
+
+    const totalAllocations = Number(allocationStats?.total) || 0;
+    const presentAllocations = Number(allocationStats?.present) || 0;
+    const totalEmployees = Number(employeeStats?.total) || 0;
+    const activeEmployees = Number(employeeStats?.active) || 0;
+    const employeesWithDocs = Number(docStats?.employeesWithDocs) || 0;
+    const occurrenceCount = Number(occurrenceStats?.count) || 0;
+
+    const safeDiv = (numerator: number, denominator: number, multiplier: number = 100) => {
+      if (denominator <= 0) return 0;
+      return Math.round((numerator / denominator) * multiplier);
+    };
+
+    return {
+      attendanceRate: safeDiv(presentAllocations, totalAllocations),
+      documentationRate: safeDiv(employeesWithDocs, totalEmployees),
+      activeEmployeeRate: safeDiv(activeEmployees, totalEmployees),
+      occurrenceRate: activeEmployees > 0 ? Math.round((occurrenceCount / activeEmployees) * 10) / 10 : 0,
     };
   }
 }

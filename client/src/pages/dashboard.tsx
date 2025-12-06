@@ -2,16 +2,59 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Briefcase, CalendarDays, AlertCircle, FileText, TrendingUp, Clock, CheckCircle } from "lucide-react";
+import { Users, Briefcase, CalendarDays, AlertCircle, FileText, TrendingUp, Clock, CheckCircle, BarChart3, PieChart } from "lucide-react";
 import type { Employee, ServicePost, Allocation, Occurrence, Document } from "@shared/schema";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  Legend,
+  BarChart,
+  Bar,
+} from "recharts";
 
-interface DashboardStats {
-  employees: { total: number; active: number };
-  servicePosts: { total: number };
-  allocations: { today: number; present: number };
-  occurrences: { thisMonth: number };
-  documents: { total: number };
+interface AllocationTrend {
+  date: string;
+  present: number;
+  absent: number;
+  justified: number;
+  vacation: number;
+  medical_leave: number;
 }
+
+interface OccurrenceByCategory {
+  category: string;
+  count: number;
+}
+
+interface ComplianceMetrics {
+  attendanceRate: number;
+  documentationRate: number;
+  activeEmployeeRate: number;
+  occurrenceRate: number;
+}
+
+const CHART_COLORS = {
+  present: "hsl(var(--chart-1))",
+  absent: "hsl(var(--chart-2))",
+  justified: "hsl(var(--chart-3))",
+  vacation: "hsl(var(--chart-4))",
+  medical_leave: "hsl(var(--chart-5))",
+};
+
+const CATEGORY_COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+];
 
 function StatCard({ 
   title, 
@@ -59,6 +102,31 @@ function StatCard({
   );
 }
 
+function ComplianceMetricBar({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">{label}</span>
+        <span className="text-sm text-muted-foreground">{value}%</span>
+      </div>
+      <div className="h-2 rounded-full bg-muted overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${Math.min(value, 100)}%`, backgroundColor: color }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ChartSkeleton() {
+  return (
+    <div className="flex flex-col gap-4">
+      <Skeleton className="h-[200px] w-full" />
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { data: employees, isLoading: employeesLoading } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
@@ -78,6 +146,18 @@ export default function Dashboard() {
 
   const { data: documents, isLoading: documentsLoading } = useQuery<Document[]>({
     queryKey: ["/api/documents"],
+  });
+
+  const { data: allocationTrends, isLoading: trendsLoading } = useQuery<AllocationTrend[]>({
+    queryKey: ["/api/analytics/allocation-trends"],
+  });
+
+  const { data: occurrencesByCategory, isLoading: categoriesLoading } = useQuery<OccurrenceByCategory[]>({
+    queryKey: ["/api/analytics/occurrences-by-category"],
+  });
+
+  const { data: complianceMetrics, isLoading: metricsLoading } = useQuery<ComplianceMetrics>({
+    queryKey: ["/api/analytics/compliance-metrics"],
   });
 
   const isLoading = employeesLoading || postsLoading || allocationsLoading || occurrencesLoading || documentsLoading;
@@ -103,6 +183,23 @@ export default function Dashboard() {
   };
 
   const recentOccurrences = occurrences?.slice(0, 5) || [];
+
+  const formattedTrends = allocationTrends?.map(trend => ({
+    ...trend,
+    date: new Date(trend.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+  })) || [];
+
+  const categoryLabels: Record<string, string> = {
+    absence: "Absence",
+    substitution: "Substitution",
+    issue: "Issue",
+    note: "Note",
+  };
+
+  const formattedCategories = occurrencesByCategory?.map(cat => ({
+    name: categoryLabels[cat.category] || cat.category,
+    value: cat.count,
+  })) || [];
 
   return (
     <div className="space-y-8">
@@ -146,7 +243,186 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Allocation Trends (Last 30 Days)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {trendsLoading ? (
+              <ChartSkeleton />
+            ) : formattedTrends.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <BarChart3 className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">No allocation data available</p>
+              </div>
+            ) : (
+              <div className="h-[250px]" data-testid="chart-allocation-trends">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={formattedTrends} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis 
+                      dataKey="date" 
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                      className="text-muted-foreground"
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                      className="text-muted-foreground"
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '6px',
+                      }}
+                      labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="present" 
+                      stackId="1" 
+                      stroke={CHART_COLORS.present} 
+                      fill={CHART_COLORS.present} 
+                      fillOpacity={0.6}
+                      name="Present"
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="absent" 
+                      stackId="1" 
+                      stroke={CHART_COLORS.absent} 
+                      fill={CHART_COLORS.absent} 
+                      fillOpacity={0.6}
+                      name="Absent"
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="vacation" 
+                      stackId="1" 
+                      stroke={CHART_COLORS.vacation} 
+                      fill={CHART_COLORS.vacation} 
+                      fillOpacity={0.6}
+                      name="Vacation"
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="medical_leave" 
+                      stackId="1" 
+                      stroke={CHART_COLORS.medical_leave} 
+                      fill={CHART_COLORS.medical_leave} 
+                      fillOpacity={0.6}
+                      name="Medical Leave"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PieChart className="h-5 w-5" />
+              Occurrences by Category (Last 30 Days)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {categoriesLoading ? (
+              <ChartSkeleton />
+            ) : formattedCategories.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <PieChart className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">No occurrence data available</p>
+              </div>
+            ) : (
+              <div className="h-[250px]" data-testid="chart-occurrences-category">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPieChart>
+                    <Pie
+                      data={formattedCategories}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      labelLine={false}
+                    >
+                      {formattedCategories.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '6px',
+                      }}
+                    />
+                    <Legend />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
+              Compliance Metrics
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {metricsLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            ) : (
+              <div className="space-y-4" data-testid="compliance-metrics">
+                <ComplianceMetricBar 
+                  label="Attendance Rate" 
+                  value={complianceMetrics?.attendanceRate || 0} 
+                  color="hsl(var(--chart-1))"
+                />
+                <ComplianceMetricBar 
+                  label="Documentation Rate" 
+                  value={complianceMetrics?.documentationRate || 0} 
+                  color="hsl(var(--chart-2))"
+                />
+                <ComplianceMetricBar 
+                  label="Active Employee Rate" 
+                  value={complianceMetrics?.activeEmployeeRate || 0} 
+                  color="hsl(var(--chart-3))"
+                />
+                <div className="pt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Occurrences per Employee</span>
+                    <span className="text-sm text-muted-foreground">{complianceMetrics?.occurrenceRate || 0}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Last 30 days average</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
               Quick Stats
             </CardTitle>
           </CardHeader>

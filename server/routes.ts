@@ -81,6 +81,37 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/analytics/allocation-trends", isAuthenticated, async (req, res) => {
+    try {
+      const days = req.query.days ? parseInt(req.query.days as string) : 30;
+      const trends = await storage.getAllocationTrends(days);
+      res.json(trends);
+    } catch (error) {
+      console.error("Error fetching allocation trends:", error);
+      res.status(500).json({ message: "Failed to fetch allocation trends" });
+    }
+  });
+
+  app.get("/api/analytics/occurrences-by-category", isAuthenticated, async (_req, res) => {
+    try {
+      const data = await storage.getOccurrencesByCategory();
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching occurrences by category:", error);
+      res.status(500).json({ message: "Failed to fetch occurrences by category" });
+    }
+  });
+
+  app.get("/api/analytics/compliance-metrics", isAuthenticated, async (_req, res) => {
+    try {
+      const metrics = await storage.getComplianceMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching compliance metrics:", error);
+      res.status(500).json({ message: "Failed to fetch compliance metrics" });
+    }
+  });
+
   app.get("/api/employees", isAuthenticated, async (req, res) => {
     try {
       const { search } = req.query;
