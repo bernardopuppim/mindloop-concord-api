@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useParams } from "wouter";
 import { ArrowLeft, Pencil, Users, FileText, UserPlus, ClipboardList, Plus, Trash2, Edit, CheckCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -54,10 +54,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { ServicePost, Allocation, Document, Employee, ServiceActivity, InsertServiceActivity } from "@shared/schema";
 
-interface ServicePostViewProps {
-  postId: number;
-}
-
 const activityFormSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
   description: z.string().optional(),
@@ -75,7 +71,9 @@ const frequencyLabels: Record<string, string> = {
   on_demand: "Sob Demanda",
 };
 
-export default function ServicePostView({ postId }: ServicePostViewProps) {
+export default function ServicePostView() {
+  const params = useParams<{ id: string }>();
+  const postId = params.id ? parseInt(params.id, 10) : NaN;
   const { isAdmin } = useAuth();
   const { toast } = useToast();
   
@@ -85,6 +83,7 @@ export default function ServicePostView({ postId }: ServicePostViewProps) {
 
   const { data: servicePost, isLoading } = useQuery<ServicePost>({
     queryKey: ["/api/service-posts", postId],
+    enabled: !isNaN(postId),
   });
 
   const { data: documents } = useQuery<Document[]>({
@@ -106,6 +105,7 @@ export default function ServicePostView({ postId }: ServicePostViewProps) {
       if (!res.ok) throw new Error("Failed to fetch activities");
       return res.json();
     },
+    enabled: !isNaN(postId),
   });
 
   const activityForm = useForm<ActivityFormData>({
