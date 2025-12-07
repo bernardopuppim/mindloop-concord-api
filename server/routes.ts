@@ -150,6 +150,16 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/analytics/activity-execution-stats", isAuthenticated, async (_req, res) => {
+    try {
+      const stats = await storage.getActivityExecutionStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching activity execution stats:", error);
+      res.status(500).json({ message: "Failed to fetch activity execution stats" });
+    }
+  });
+
   app.get("/api/employees", isAuthenticated, async (req: any, res) => {
     try {
       const { search } = req.query;

@@ -219,7 +219,7 @@ export default function ActivityExecutionsPage() {
       date: executionDialog.date,
       quantity: executionQuantity,
       notes: executionNotes || null,
-      employeeId: executionEmployeeId ? parseInt(executionEmployeeId) : null,
+      employeeId: executionEmployeeId && executionEmployeeId !== "none" ? parseInt(executionEmployeeId) : null,
       existingId: executionDialog.existingExecution?.id,
     });
   };
@@ -247,7 +247,21 @@ export default function ActivityExecutionsPage() {
       <PageHeader
         title="Execuções de Atividades"
         description="Registre e acompanhe a execução das atividades configuradas para cada posto de serviço"
-      />
+      >
+        {selectedPost && activities && activities.length > 0 && isAdmin && (
+          <Button 
+            onClick={() => {
+              if (activities[0]) {
+                openExecutionDialog(activities[0], new Date());
+              }
+            }}
+            data-testid="button-register-execution"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Registrar Execução
+          </Button>
+        )}
+      </PageHeader>
 
       <Card>
         <CardHeader>
@@ -285,6 +299,9 @@ export default function ActivityExecutionsPage() {
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <FileText className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground">Selecione um posto de serviço para visualizar as atividades</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                O registro de execuções é essencial para comprovação do cumprimento contratual
+              </p>
             </div>
           ) : isLoading ? (
             <div className="space-y-4">
@@ -297,7 +314,7 @@ export default function ActivityExecutionsPage() {
               <FileText className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground">Nenhuma atividade configurada para este posto</p>
               <p className="text-sm text-muted-foreground mt-2">
-                Configure as atividades na página do posto de serviço
+                Configure as atividades do contrato na página do posto de serviço para habilitar o registro de execuções
               </p>
             </div>
           ) : (
@@ -391,7 +408,7 @@ export default function ActivityExecutionsPage() {
                   <SelectValue placeholder="Selecione um funcionário" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
+                  <SelectItem value="none">Nenhum</SelectItem>
                   {activeEmployees.map((emp) => (
                     <SelectItem key={emp.id} value={emp.id.toString()}>
                       {emp.name}

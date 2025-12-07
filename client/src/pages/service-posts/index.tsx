@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Plus, Eye, Pencil, Trash2, Search, Filter, X } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, Search, Filter, X, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -108,6 +108,17 @@ export default function ServicePostsPage() {
           <Button variant="ghost" size="icon" asChild data-testid={`button-view-post-${post.id}`}>
             <Link href={`/service-posts/${post.id}`}>
               <Eye className="h-4 w-4" />
+            </Link>
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            asChild 
+            title="Gerenciar Atividades"
+            data-testid={`button-activities-post-${post.id}`}
+          >
+            <Link href={`/service-posts/${post.id}#activities`}>
+              <ClipboardList className="h-4 w-4" />
             </Link>
           </Button>
           {isAdmin && (

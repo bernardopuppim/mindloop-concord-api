@@ -133,6 +133,14 @@ export interface IStorage {
     occurrenceRate: number;
   }>;
 
+  getActivityExecutionStats(): Promise<{
+    todayExecutions: number;
+    pendingToday: number;
+    monthlyPlanned: number;
+    monthlyExecuted: number;
+    postsWithoutExecution: number;
+  }>;
+
   getNotificationSettings(): Promise<NotificationSettingsWithRelations[]>;
   getNotificationSettingsByUser(userId: string): Promise<NotificationSettings | undefined>;
   createNotificationSettings(settings: InsertNotificationSettings): Promise<NotificationSettings>;
@@ -778,6 +786,90 @@ export class DatabaseStorage implements IStorage {
       documentationRate: safeDiv(employeesWithDocs, totalEmployees),
       activeEmployeeRate: safeDiv(activeEmployees, totalEmployees),
       occurrenceRate: activeEmployees > 0 ? Math.round((occurrenceCount / activeEmployees) * 10) / 10 : 0,
+    };
+  }
+
+  async getActivityExecutionStats(): Promise<{
+    todayExecutions: number;
+    pendingToday: number;
+    monthlyPlanned: number;
+    monthlyExecuted: number;
+    postsWithoutExecution: number;
+  }> {
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+    const [todayStats] = await db
+      .select({
+        count: sql<number>`count(*)`,
+      })
+      .from(activityExecutions)
+      .where(eq(activityExecutions.date, today));
+
+    const todayExecutions = Number(todayStats?.count) || 0;
+
+    const allActivities = await db.select().from(serviceActivities);
+    
+    const todayExecutionsByActivity = await db
+      .select({
+        activityId: activityExecutions.serviceActivityId,
+        count: sql<number>`count(*)`,
+      })
+      .from(activityExecutions)
+      .where(eq(activityExecutions.date, today))
+      .groupBy(activityExecutions.serviceActivityId);
+    
+    const executedActivityIds = new Set(todayExecutionsByActivity.map(e => e.activityId));
+    
+    const dailyActivities = allActivities.filter(a => a.frequency === 'daily');
+    const pendingToday = dailyActivities.filter(a => !executedActivityIds.has(a.id)).length;
+
+    const [monthlyExecutedStats] = await db
+      .select({
+        count: sql<number>`count(*)`,
+      })
+      .from(activityExecutions)
+      .where(and(
+        gte(activityExecutions.date, monthStart),
+        lte(activityExecutions.date, monthEnd)
+      ));
+
+    const monthlyExecuted = Number(monthlyExecutedStats?.count) || 0;
+
+    const monthlyPlanned = allActivities.reduce((sum, activity) => {
+      switch (activity.frequency) {
+        case 'daily': return sum + daysInMonth;
+        case 'weekly': return sum + Math.ceil(daysInMonth / 7);
+        case 'monthly': return sum + 1;
+        default: return sum;
+      }
+    }, 0);
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+
+    const postsWithActivities = await db
+      .selectDistinct({ postId: serviceActivities.servicePostId })
+      .from(serviceActivities);
+    
+    const postsWithRecentExecution = await db
+      .selectDistinct({ postId: activityExecutions.servicePostId })
+      .from(activityExecutions)
+      .where(gte(activityExecutions.date, sevenDaysAgoStr));
+
+    const postsWithExecutionIds = new Set(postsWithRecentExecution.map(p => p.postId));
+    const postsWithoutExecution = postsWithActivities.filter(p => !postsWithExecutionIds.has(p.postId)).length;
+
+    return {
+      todayExecutions,
+      pendingToday,
+      monthlyPlanned,
+      monthlyExecuted,
+      postsWithoutExecution,
     };
   }
 

@@ -1,0 +1,208 @@
+You are working on a full-stack application called "ContractFlow Manager". It already contains: employees, service posts, allocations, documents, occurrences, alerts, reports, audit logs, LGPD logs and notifications. A new module called “Activity Executions” was partially generated, but the UI is incomplete. Your task is to fully implement the missing UX screens and connect them to the existing backend API.
+
+🎯 OBJECTIVE
+
+I need you to fully implement and expose in the UI the new feature required by Petrobras contract clause 9.3.4:
+
+“The system must be able to track and evidence the effective execution of services by employees allocated to each service post, including activity records and attachments.”
+
+The backend already has:
+
+service_activities
+
+activity_executions
+
+activity_execution_attachments
+
+And CRUD endpoints exist for all of them.
+
+But the UI is missing:
+
+Button to configure the activities of each service post
+
+Screen to list and manage activities of a service post
+
+Button to register an activity execution
+
+A friendly calendar/month view that allows selecting a day and viewing executions
+
+A clean form UI to register a new execution, including file uploads
+
+Visual indicators on dashboard/widgets about activity execution metrics
+
+Improved navigation UX so users clearly understand the flow
+
+Validation, empty states, confirmations
+
+Integration with reports module (Previsto × Realizado)
+
+You must implement all missing UI components and integrate them with the existing API.
+
+🧭 UX IMPROVEMENTS REQUIRED
+🔵 1. Add “Atividades do Posto” in Service Posts (Postos de Serviço)
+
+Inside the table actions, add a new icon or action:
+
+🗂️ Atividades
+
+When clicked:
+
+Navigate to:
+/service-posts/{postId}/activities
+
+Show list of activities configured for that post
+
+Add button: “+ Adicionar Atividade do Posto”
+
+Activity fields:
+
+title
+
+description
+
+frequency (daily / weekly / monthly / per shift)
+
+evidence_required (boolean)
+
+active/inactive
+
+CRUD must work.
+
+🟢 2. Expose Execution Module Button Clearly
+
+In left menu, the current item “Execuções de Atividades” is correct, but:
+
+Inside that page, you MUST show on top:
+
+Dropdown: “Selecionar Posto de Serviço”
+Button: “Registrar Execução de Atividade”
+
+This button was NOT generated — create it.
+
+🟠 3. Execution Registration Form
+
+When clicking “Registrar Execução de Atividade”, open modal or new route:
+
+/activity-executions/new?postId=X&date=YYYY-MM-DD
+
+Form fields:
+
+Posto (read-only if coming from context)
+
+Date selector (default today)
+
+Activity selector (dropdown listing activities of the selected post)
+
+Description textarea
+
+Attachments field (multi-file upload)
+
+Submit button
+
+On submit:
+
+POST to /api/activity_executions
+
+Then upload attachments to /api/activity_execution_attachments
+
+Show success toast + return to executions screen.
+
+🟡 4. Calendar / Schedule View
+
+Inside Execuções de Atividades page, include a monthly calendar view:
+
+Days should display a dot or highlight if there are executions recorded
+
+Clicking a day shows:
+
+List of executed activities
+
+Button "Registrar execução neste dia"
+
+🟣 5. Dashboard Widgets for Contract Execution
+
+Create new widgets in dashboard:
+
+“Execuções de Atividades Hoje”
+
+“Execuções Pendentes do Dia”
+
+“Atividades Previstas × Realizadas (mês)”
+
+“Postos sem execução registrada há X dias”
+
+Backend endpoints exist — combine them intelligently.
+
+🔴 6. Empty States + UX Writing
+
+Add friendly empty states such as:
+
+“Nenhuma atividade cadastrada para este posto. Configure as atividades previstas no Anexo 1A.”
+
+“Nenhuma execução registrada para esta data. Clique no botão acima para registrar.”
+
+Add brief micro-explanations:
+
+“As atividades registradas aqui comprovam a efetiva execução contratual conforme cláusula 9.3.4.”
+
+🧩 API ENDPOINTS YOU MUST USE
+
+The backend already has endpoints:
+
+Activities
+
+GET /api/service_activities?postId=
+
+POST /api/service_activities
+
+PUT /api/service_activities/{id}
+
+DELETE /api/service_activities/{id}
+
+Executions
+
+GET /api/activity_executions?postId=&month=&year=
+
+POST /api/activity_executions
+
+Attachments
+
+POST /api/activity_execution_attachments
+
+You must wire the UI to these APIs.
+
+✔️ CRITERIA FOR COMPLETE DELIVERY
+
+The feature is complete ONLY when:
+
+(1) Activities can be created/edited/deleted per service post
+
+With dedicated screen and proper CRUD.
+
+(2) Users can register activity executions
+
+Through a clear, visible button and intuitive form.
+
+(3) Executions appear in a calendar or list view
+(4) Attachments upload works
+(5) Dashboard includes contractual execution indicators
+(6) Reports → Previsto × Realizado uses real execution data
+(7) UX is self-explanatory and aligned with contract clause 9.3.4
+(8) The system feels coherent and discoverable
+🙏 Additional Instructions for Replit AI
+
+Do NOT break existing features
+
+Follow the design system already used (shadcn/ui + Tailwind)
+
+Keep routing schema and API paths unchanged
+
+Reuse existing components (Tables, Forms, Dialogs, Buttons)
+
+If a function already exists, reuse it instead of duplicating
+
+Keep code clean, typed (TS) and consistent
+
+🧨 FINAL MESSAGE TO REPLIT AI
+
+When you start implementing, please generate the full updated code for the new screens, components, forms and routes. If any file is missing context, ask me to reveal it. Continue until the entire module is working end-to-end.

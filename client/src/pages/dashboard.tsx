@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Briefcase, CalendarDays, AlertCircle, FileText, TrendingUp, Clock, CheckCircle, BarChart3, PieChart } from "lucide-react";
+import { Users, Briefcase, CalendarDays, AlertCircle, FileText, TrendingUp, Clock, CheckCircle, BarChart3, PieChart, ClipboardCheck, Activity, Target } from "lucide-react";
 import type { Employee, ServicePost, Allocation, Occurrence, Document } from "@shared/schema";
 import { translations } from "@/lib/translations";
 import {
@@ -38,6 +38,14 @@ interface ComplianceMetrics {
   documentationRate: number;
   activeEmployeeRate: number;
   occurrenceRate: number;
+}
+
+interface ActivityExecutionStats {
+  todayExecutions: number;
+  pendingToday: number;
+  monthlyPlanned: number;
+  monthlyExecuted: number;
+  postsWithoutExecution: number;
 }
 
 const CHART_COLORS = {
@@ -159,6 +167,10 @@ export default function Dashboard() {
     queryKey: ["/api/analytics/compliance-metrics"],
   });
 
+  const { data: activityExecutionStats, isLoading: activityStatsLoading } = useQuery<ActivityExecutionStats>({
+    queryKey: ["/api/analytics/activity-execution-stats"],
+  });
+
   const isLoading = employeesLoading || postsLoading || allocationsLoading || occurrencesLoading || documentsLoading;
 
   const stats = {
@@ -237,6 +249,63 @@ export default function Dashboard() {
           isLoading={isLoading}
         />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ClipboardCheck className="h-5 w-5" />
+            Execuções de Atividades
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+                <Activity className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-semibold" data-testid="stat-today-executions">
+                  {activityStatsLoading ? "-" : activityExecutionStats?.todayExecutions || 0}
+                </p>
+                <p className="text-sm text-muted-foreground">Execuções Hoje</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-destructive/10">
+                <Clock className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <p className="text-2xl font-semibold" data-testid="stat-pending-today">
+                  {activityStatsLoading ? "-" : activityExecutionStats?.pendingToday || 0}
+                </p>
+                <p className="text-sm text-muted-foreground">Pendentes Hoje</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+                <Target className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-semibold" data-testid="stat-monthly-progress">
+                  {activityStatsLoading ? "-" : `${activityExecutionStats?.monthlyExecuted || 0}/${activityExecutionStats?.monthlyPlanned || 0}`}
+                </p>
+                <p className="text-sm text-muted-foreground">Realizado/Previsto (mês)</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+                <Briefcase className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-2xl font-semibold" data-testid="stat-posts-without-execution">
+                  {activityStatsLoading ? "-" : activityExecutionStats?.postsWithoutExecution || 0}
+                </p>
+                <p className="text-sm text-muted-foreground">Postos sem execução (7 dias)</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
