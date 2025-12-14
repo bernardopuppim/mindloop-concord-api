@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDateTime } from "@/lib/authUtils";
-import type { User, LgpdLog } from "@shared/schema";
+import type { User, LgpdLog } from "@shared/types";
 
 type LgpdLogWithUser = LgpdLog & { user?: User | null };
 

@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { translations } from "@/lib/translations";
-import type { Occurrence, Employee, ServicePost } from "@shared/schema";
+import type { Occurrence, Employee, ServicePost } from "@shared/types";
 
 const formSchema = z.object({
   date: z.string().min(1, translations.validation.required),

@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 import { db } from "../server/db";
 import {
   employees,

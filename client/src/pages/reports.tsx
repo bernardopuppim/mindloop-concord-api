@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { getMonthYearOptions, formatDate } from "@/lib/authUtils";
 import { translations } from "@/lib/translations";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from "recharts";
-import type { Allocation, Occurrence, Document, Employee, ServicePost } from "@shared/schema";
+import type { Allocation, Occurrence, Document, Employee, ServicePost } from "@shared/types";
 
 type PrevistoRealizadoReport = {
   summary: { totalPrevisto: number; totalRealizado: number; compliancePercentage: number };

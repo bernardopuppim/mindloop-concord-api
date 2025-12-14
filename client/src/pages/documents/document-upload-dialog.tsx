@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { getMonthYearOptions } from "@/lib/authUtils";
 import { translations } from "@/lib/translations";
-import type { Employee, ServicePost } from "@shared/schema";
+import type { Employee, ServicePost } from "@shared/types";
 
 interface DocumentUploadDialogProps {
   open: boolean;

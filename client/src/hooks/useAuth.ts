@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { User } from "@shared/schema";
+import type { User } from "@shared/types";
 import { useDevRole, mapDevRoleToUserRole } from "@/contexts/DevRoleContext";
 
 export type UserRole = "admin" | "admin_dica" | "operator_dica" | "fiscal_petrobras" | "viewer";

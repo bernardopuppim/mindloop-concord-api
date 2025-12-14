@@ -1,4 +1,7 @@
 import { sql, relations } from "drizzle-orm";
+
+import { createInsertSchema } from "drizzle-zod";
+
 import {
   index,
   jsonb,
@@ -11,10 +14,10 @@ import {
   boolean,
   pgEnum,
 } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
 
-// Enums
+// =========================
+// ENUMS
+// =========================
 export const userRoleEnum = pgEnum("user_role", ["admin", "admin_dica", "operator_dica", "fiscal_petrobras", "viewer"]);
 export const employeeStatusEnum = pgEnum("employee_status", ["active", "inactive"]);
 export const modalityEnum = pgEnum("modality", ["onsite", "hybrid", "remote"]);
@@ -27,20 +30,11 @@ export const alertStatusEnum = pgEnum("alert_status", ["pending", "resolved"]);
 export const lgpdAccessTypeEnum = pgEnum("lgpd_access_type", ["view", "export", "search"]);
 export const lgpdDataCategoryEnum = pgEnum("lgpd_data_category", ["personal_data", "sensitive_data", "financial_data"]);
 export const feriasLicencasTypeEnum = pgEnum("ferias_licencas_type", [
-  "ferias", 
-  "licenca_medica", 
-  "licenca_maternidade", 
-  "licenca_paternidade", 
-  "licenca_nojo", 
-  "licenca_casamento",
-  "outros"
+  "ferias", "licenca_medica", "licenca_maternidade", "licenca_paternidade",
+  "licenca_nojo", "licenca_casamento", "outros"
 ]);
 export const feriasLicencasStatusEnum = pgEnum("ferias_licencas_status", [
-  "pendente", 
-  "aprovado", 
-  "rejeitado", 
-  "em_andamento", 
-  "concluido"
+  "pendente", "aprovado", "rejeitado", "em_andamento", "concluido"
 ]);
 
 export const activityFrequencyEnum = pgEnum("activity_frequency", [
@@ -50,7 +44,11 @@ export const activityFrequencyEnum = pgEnum("activity_frequency", [
   "on_demand"
 ]);
 
-// Session storage table - Required for Replit Auth
+// =========================
+// TABLES
+// =========================
+
+// Sessions (Replit Auth reference, optional)
 export const sessions = pgTable(
   "sessions",
   {
@@ -58,12 +56,12 @@ export const sessions = pgTable(
     sess: jsonb("sess").notNull(),
     expire: timestamp("expire").notNull(),
   },
-  (table) => [index("IDX_session_expire").on(table.expire)],
+  (table) => [index("IDX_session_expire").on(table.expire)]
 );
 
-// Users table - Required for Replit Auth with role extension
+// Users
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id").primaryKey(),
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
@@ -73,7 +71,7 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Employees table
+// Employees
 export const employees = pgTable("employees", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   name: varchar("name", { length: 255 }).notNull(),
@@ -87,7 +85,7 @@ export const employees = pgTable("employees", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Service Posts table (Anexo 1A enhanced)
+// Service Posts
 export const servicePosts = pgTable("service_posts", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   postCode: varchar("post_code", { length: 50 }).notNull().unique(),
@@ -103,7 +101,7 @@ export const servicePosts = pgTable("service_posts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Allocations table
+// Allocations
 export const allocations = pgTable("allocations", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   employeeId: integer("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
@@ -115,141 +113,127 @@ export const allocations = pgTable("allocations", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Occurrences table (enhanced with treated status)
+// Occurrences
 export const occurrences = pgTable("occurrences", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   date: date("date").notNull(),
-  employeeId: integer("employee_id").references(() => employees.id, { onDelete: "set null" }),
-  postId: integer("post_id").references(() => servicePosts.id, { onDelete: "set null" }),
+  employeeId: integer("employee_id").references(() => employees.id),
+  postId: integer("post_id").references(() => servicePosts.id),
   description: text("description").notNull(),
   category: occurrenceCategoryEnum("category").notNull(),
   treated: boolean("treated").default(false).notNull(),
-  treatedBy: varchar("treated_by").references(() => users.id, { onDelete: "set null" }),
+  treatedBy: varchar("treated_by").references(() => users.id),
   treatedAt: timestamp("treated_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Documents table (Anexo 1B enhanced with version tracking)
+// Documents
 export const documents = pgTable("documents", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  filename: varchar("filename", { length: 255 }).notNull(),
-  originalName: varchar("original_name", { length: 255 }).notNull(),
-  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  filename: varchar("filename").notNull(),
+  originalName: varchar("original_name").notNull(),
+  mimeType: varchar("mime_type").notNull(),
   size: integer("size").notNull(),
-  path: varchar("path", { length: 500 }).notNull(),
-  documentType: documentTypeEnum("document_type").default("other").notNull(),
-  category: documentCategoryEnum("category").default("outros"),
-  employeeId: integer("employee_id").references(() => employees.id, { onDelete: "set null" }),
-  postId: integer("post_id").references(() => servicePosts.id, { onDelete: "set null" }),
-  monthYear: varchar("month_year", { length: 7 }),
+  path: varchar("path").notNull(),
+  documentType: documentTypeEnum("document_type").notNull(),
+  category: documentCategoryEnum("category"),
+  employeeId: integer("employee_id").references(() => employees.id),
+  postId: integer("post_id").references(() => servicePosts.id),
+  monthYear: varchar("month_year"),
   expirationDate: date("expiration_date"),
   observations: text("observations"),
-  uploadedBy: varchar("uploaded_by").references(() => users.id, { onDelete: "set null" }),
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
   version: integer("version").default(1).notNull(),
   previousVersionId: integer("previous_version_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Document Checklists table (required documents per posto)
+// Document Checklists
 export const documentChecklists = pgTable("document_checklists", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  postId: integer("post_id").notNull().references(() => servicePosts.id, { onDelete: "cascade" }),
+  postId: integer("post_id").notNull().references(() => servicePosts.id),
   documentType: documentTypeEnum("document_type").notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
+  name: varchar("name").notNull(),
   description: text("description"),
   isRequired: boolean("is_required").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Audit Logs table (enhanced with diff tracking)
+// Audit Logs
 export const auditLogs = pgTable("audit_logs", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
-  action: varchar("action", { length: 50 }).notNull(),
-  entityType: varchar("entity_type", { length: 100 }).notNull(),
-  entityId: varchar("entity_id", { length: 100 }),
+  userId: varchar("user_id").references(() => users.id),
+  action: varchar("action").notNull(),
+  entityType: varchar("entity_type").notNull(),
+  entityId: varchar("entity_id"),
   details: jsonb("details"),
   diffBefore: jsonb("diff_before"),
   diffAfter: jsonb("diff_after"),
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
-// Notification Settings table
-export const notificationSettings = pgTable("notification_settings", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
-  email: varchar("email", { length: 255 }).notNull(),
-  notifyNewOccurrences: boolean("notify_new_occurrences").default(true).notNull(),
-  notifyMissingAllocations: boolean("notify_missing_allocations").default(true).notNull(),
-  notifyDocumentExpiration: boolean("notify_document_expiration").default(true).notNull(),
-  notifyDailySummary: boolean("notify_daily_summary").default(false).notNull(),
-  isActive: boolean("is_active").default(true).notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Alerts table (for workflows)
+// Alerts
 export const alerts = pgTable("alerts", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   type: alertTypeEnum("type").notNull(),
   status: alertStatusEnum("status").default("pending").notNull(),
   message: text("message").notNull(),
-  entityType: varchar("entity_type", { length: 50 }),
+  entityType: varchar("entity_type"),
   entityId: integer("entity_id"),
-  resolvedBy: varchar("resolved_by").references(() => users.id, { onDelete: "set null" }),
+  resolvedBy: varchar("resolved_by").references(() => users.id),
   resolvedAt: timestamp("resolved_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// LGPD Logs table (for data protection compliance)
+// LGPD Logs
 export const lgpdLogs = pgTable("lgpd_logs", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  userId: varchar("user_id").references(() => users.id),
   accessType: lgpdAccessTypeEnum("access_type").notNull(),
   dataCategory: lgpdDataCategoryEnum("data_category").notNull(),
-  entityType: varchar("entity_type", { length: 100 }).notNull(),
-  entityId: varchar("entity_id", { length: 100 }),
-  ipAddress: varchar("ip_address", { length: 45 }),
+  entityType: varchar("entity_type").notNull(),
+  entityId: varchar("entity_id"),
+  ipAddress: varchar("ip_address"),
   userAgent: text("user_agent"),
   details: jsonb("details"),
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
-// Férias e Licenças table
+// Férias e Licenças
 export const feriasLicencas = pgTable("ferias_licencas", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  employeeId: integer("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  employeeId: integer("employee_id").notNull().references(() => employees.id),
   type: feriasLicencasTypeEnum("type").notNull(),
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
   status: feriasLicencasStatusEnum("status").default("pendente").notNull(),
   observations: text("observations"),
-  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Service Activities table (configuration per post)
+// Service Activities
 export const serviceActivities = pgTable("service_activities", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  servicePostId: integer("service_post_id").notNull().references(() => servicePosts.id, { onDelete: "cascade" }),
-  name: varchar("name", { length: 255 }).notNull(),
+  servicePostId: integer("service_post_id").notNull().references(() => servicePosts.id),
+  name: varchar("name").notNull(),
   description: text("description"),
-  ppuUnit: varchar("ppu_unit", { length: 100 }).notNull(),
+  ppuUnit: varchar("ppu_unit").notNull(),
   frequency: activityFrequencyEnum("frequency").notNull(),
   required: boolean("required").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Activity Executions table (daily records)
+// Activity Executions
 export const activityExecutions = pgTable("activity_executions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  serviceActivityId: integer("service_activity_id").notNull().references(() => serviceActivities.id, { onDelete: "cascade" }),
-  servicePostId: integer("service_post_id").notNull().references(() => servicePosts.id, { onDelete: "cascade" }),
-  employeeId: integer("employee_id").references(() => employees.id, { onDelete: "set null" }),
+  serviceActivityId: integer("service_activity_id").notNull().references(() => serviceActivities.id),
+  servicePostId: integer("service_post_id").notNull().references(() => servicePosts.id),
+  employeeId: integer("employee_id").references(() => employees.id),
   date: date("date").notNull(),
   quantity: integer("quantity").default(1).notNull(),
   notes: text("notes"),
@@ -257,30 +241,25 @@ export const activityExecutions = pgTable("activity_executions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Activity Execution Attachments table (evidence files)
+// Activity Execution Attachments
 export const activityExecutionAttachments = pgTable("activity_execution_attachments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  activityExecutionId: integer("activity_execution_id").notNull().references(() => activityExecutions.id, { onDelete: "cascade" }),
-  fileName: varchar("file_name", { length: 255 }).notNull(),
-  filePath: varchar("file_path", { length: 500 }).notNull(),
-  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  activityExecutionId: integer("activity_execution_id").notNull().references(() => activityExecutions.id),
+  fileName: varchar("file_name").notNull(),
+  filePath: varchar("file_path").notNull(),
+  mimeType: varchar("mime_type").notNull(),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });
 
-// Relations
+// =========================
+// RELATIONS
+// =========================
+
 export const usersRelations = relations(users, ({ many }) => ({
   documents: many(documents),
   auditLogs: many(auditLogs),
-  notificationSettings: many(notificationSettings),
   resolvedAlerts: many(alerts),
   lgpdLogs: many(lgpdLogs),
-}));
-
-export const notificationSettingsRelations = relations(notificationSettings, ({ one }) => ({
-  user: one(users, {
-    fields: [notificationSettings.userId],
-    references: [users.id],
-  }),
 }));
 
 export const employeesRelations = relations(employees, ({ one, many }) => ({
@@ -298,24 +277,6 @@ export const servicePostsRelations = relations(servicePosts, ({ many }) => ({
   allocations: many(allocations),
   documents: many(documents),
   checklists: many(documentChecklists),
-}));
-
-export const documentChecklistsRelations = relations(documentChecklists, ({ one }) => ({
-  post: one(servicePosts, {
-    fields: [documentChecklists.postId],
-    references: [servicePosts.id],
-  }),
-}));
-
-export const allocationsRelations = relations(allocations, ({ one }) => ({
-  employee: one(employees, {
-    fields: [allocations.employeeId],
-    references: [employees.id],
-  }),
-  post: one(servicePosts, {
-    fields: [allocations.postId],
-    references: [servicePosts.id],
-  }),
 }));
 
 export const occurrencesRelations = relations(occurrences, ({ one }) => ({
@@ -411,195 +372,16 @@ export const activityExecutionAttachmentsRelations = relations(activityExecution
   }),
 }));
 
-// Insert Schemas
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
 
-export const insertEmployeeSchema = createInsertSchema(employees).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  cpf: z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, "CPF deve estar no formato XXX.XXX.XXX-XX"),
-});
+// =========================
+// ZOD INSERT SCHEMAS
+// =========================
 
-export const insertServicePostSchema = createInsertSchema(servicePosts).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertAllocationSchema = createInsertSchema(allocations).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertOccurrenceSchema = createInsertSchema(occurrences).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  treated: true,
-  treatedBy: true,
-  treatedAt: true,
-});
-
-export const insertDocumentSchema = createInsertSchema(documents).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
-  id: true,
-  timestamp: true,
-});
-
-export const insertNotificationSettingsSchema = createInsertSchema(notificationSettings).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertAlertSchema = createInsertSchema(alerts).omit({
-  id: true,
-  createdAt: true,
-  resolvedBy: true,
-  resolvedAt: true,
-});
-
-export const insertLgpdLogSchema = createInsertSchema(lgpdLogs).omit({
-  id: true,
-  timestamp: true,
-});
-
-export const insertDocumentChecklistSchema = createInsertSchema(documentChecklists).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertFeriasLicencasSchema = createInsertSchema(feriasLicencas).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertServiceActivitySchema = createInsertSchema(serviceActivities).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertActivityExecutionSchema = createInsertSchema(activityExecutions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertActivityExecutionAttachmentSchema = createInsertSchema(activityExecutionAttachments).omit({
-  id: true,
-  uploadedAt: true,
-});
-
-// Types
-export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
-export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
-export type Employee = typeof employees.$inferSelect;
-export type InsertServicePost = z.infer<typeof insertServicePostSchema>;
-export type ServicePost = typeof servicePosts.$inferSelect;
-export type InsertAllocation = z.infer<typeof insertAllocationSchema>;
-export type Allocation = typeof allocations.$inferSelect;
-export type InsertOccurrence = z.infer<typeof insertOccurrenceSchema>;
-export type Occurrence = typeof occurrences.$inferSelect;
-export type InsertDocument = z.infer<typeof insertDocumentSchema>;
-export type Document = typeof documents.$inferSelect;
-export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
-export type AuditLog = typeof auditLogs.$inferSelect;
-export type InsertNotificationSettings = z.infer<typeof insertNotificationSettingsSchema>;
-export type NotificationSettings = typeof notificationSettings.$inferSelect;
-export type InsertAlert = z.infer<typeof insertAlertSchema>;
-export type Alert = typeof alerts.$inferSelect;
-export type InsertLgpdLog = z.infer<typeof insertLgpdLogSchema>;
-export type LgpdLog = typeof lgpdLogs.$inferSelect;
-
-// Extended types with relations
-export type EmployeeWithRelations = Employee & {
-  linkedPost?: ServicePost | null;
-};
-
-export type AllocationWithRelations = Allocation & {
-  employee?: Employee;
-  post?: ServicePost;
-};
-
-export type OccurrenceWithRelations = Occurrence & {
-  employee?: Employee | null;
-  post?: ServicePost | null;
-  treatedByUser?: User | null;
-};
-
-export type DocumentWithRelations = Document & {
-  employee?: Employee | null;
-  post?: ServicePost | null;
-  uploader?: User | null;
-};
-
-export type AuditLogWithRelations = AuditLog & {
-  user?: User | null;
-};
-
-export type NotificationSettingsWithRelations = NotificationSettings & {
-  user?: User | null;
-};
-
-export type AlertWithRelations = Alert & {
-  resolver?: User | null;
-};
-
-export type LgpdLogWithRelations = LgpdLog & {
-  user?: User | null;
-};
-
-export type InsertDocumentChecklist = z.infer<typeof insertDocumentChecklistSchema>;
-export type DocumentChecklist = typeof documentChecklists.$inferSelect;
-
-export type DocumentChecklistWithRelations = DocumentChecklist & {
-  post?: ServicePost | null;
-};
-
-export type InsertFeriasLicencas = z.infer<typeof insertFeriasLicencasSchema>;
-export type FeriasLicencas = typeof feriasLicencas.$inferSelect;
-
-export type FeriasLicencasWithRelations = FeriasLicencas & {
-  employee?: Employee | null;
-  createdByUser?: User | null;
-};
-
-export type InsertServiceActivity = z.infer<typeof insertServiceActivitySchema>;
-export type ServiceActivity = typeof serviceActivities.$inferSelect;
-
-export type InsertActivityExecution = z.infer<typeof insertActivityExecutionSchema>;
-export type ActivityExecution = typeof activityExecutions.$inferSelect;
-
-export type InsertActivityExecutionAttachment = z.infer<typeof insertActivityExecutionAttachmentSchema>;
-export type ActivityExecutionAttachment = typeof activityExecutionAttachments.$inferSelect;
-
-export type ServiceActivityWithRelations = ServiceActivity & {
-  servicePost?: ServicePost | null;
-  executions?: ActivityExecution[];
-};
-
-export type ActivityExecutionWithRelations = ActivityExecution & {
-  serviceActivity?: ServiceActivity | null;
-  servicePost?: ServicePost | null;
-  employee?: Employee | null;
-  attachments?: ActivityExecutionAttachment[];
-};
-
-export type ActivityExecutionAttachmentWithRelations = ActivityExecutionAttachment & {
-  execution?: ActivityExecution | null;
-};
+export const insertEmployeeSchema = createInsertSchema(employees);
+export const insertServicePostSchema = createInsertSchema(servicePosts);
+export const insertAllocationSchema = createInsertSchema(allocations);
+export const insertOccurrenceSchema = createInsertSchema(occurrences);
+export const insertDocumentChecklistSchema = createInsertSchema(documentChecklists);
+export const insertFeriasLicencasSchema = createInsertSchema(feriasLicencas);
+export const insertServiceActivitySchema = createInsertSchema(serviceActivities);
+export const insertActivityExecutionSchema = createInsertSchema(activityExecutions);

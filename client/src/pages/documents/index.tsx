@@ -19,7 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDate } from "@/lib/authUtils";
 import { translations } from "@/lib/translations";
-import type { Document, Employee, ServicePost } from "@shared/schema";
+import type { Document, Employee, ServicePost } from "@shared/types";
 
 function getFileIcon(mimeType: string) {
   if (mimeType.startsWith("image/")) return Image;

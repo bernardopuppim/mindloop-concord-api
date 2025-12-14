@@ -34,7 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { translations } from "@/lib/translations";
-import type { NotificationSettings } from "@shared/schema";
+import type { NotificationSettings } from "@shared/types";
 
 interface NotificationStatus {
   emailServiceConfigured: boolean;

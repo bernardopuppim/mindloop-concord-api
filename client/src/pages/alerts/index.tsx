@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { translations } from "@/lib/translations";
-import type { Employee, Document, Occurrence } from "@shared/schema";
+import type { Employee, Document, Occurrence } from "@shared/types";
 
 export default function AlertsIndex() {
   const { data: employees, isLoading: employeesLoading } = useQuery<Employee[]>({

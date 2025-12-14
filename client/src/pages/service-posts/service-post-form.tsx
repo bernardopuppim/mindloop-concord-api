@@ -14,7 +14,7 @@ import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { translations } from "@/lib/translations";
-import type { ServicePost } from "@shared/schema";
+import type { ServicePost } from "@shared/types";
 
 const formSchema = z.object({
   postCode: z.string().min(1, translations.validation.required),

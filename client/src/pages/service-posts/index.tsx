@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { translations } from "@/lib/translations";
-import type { ServicePost } from "@shared/schema";
+import type { ServicePost } from "@shared/types";
 
 export default function ServicePostsPage() {
   const { isAdmin } = useAuth();

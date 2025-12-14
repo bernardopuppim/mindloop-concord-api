@@ -1,23 +1,32 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
+import { type Server } from "http";
+
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
+
+import { authenticateJWT } from "./auth/jwtAuth";
+import { requireRole } from "./auth/rbac";
+
 import {
   insertEmployeeSchema,
   insertServicePostSchema,
   insertAllocationSchema,
   insertOccurrenceSchema,
-  insertNotificationSettingsSchema,
   insertDocumentChecklistSchema,
   insertFeriasLicencasSchema,
   insertServiceActivitySchema,
   insertActivityExecutionSchema,
-} from "@shared/schema";
-import { emailService } from "./emailService";
+} from "../shared/schema";
+
+import { insertDocumentSchema } from "../shared/validation";
+
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
+
+/* ============================================================
+   Upload settings
+   ============================================================ */
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -26,508 +35,376 @@ if (!fs.existsSync(uploadDir)) {
 
 const upload = multer({
   storage: multer.diskStorage({
-    destination: (_req, _file, cb) => {
-      cb(null, uploadDir);
-    },
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      const filename = `${randomUUID()}${ext}`;
-      cb(null, filename);
-    },
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename: (_req, file, cb) =>
+      cb(null, `${randomUUID()}${path.extname(file.originalname)}`),
   }),
-  limits: {
-    fileSize: 10 * 1024 * 1024,
-  },
+  limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-async function logAction(
-  userId: string | undefined,
-  action: string,
-  entityType: string,
-  entityId?: string | number,
-  details?: any,
-  diffBefore?: any,
-  diffAfter?: any
-) {
+/* ============================================================
+   Audit + LGPD logs helpers
+   ============================================================ */
+
+async function logAction(userId: string | undefined, action: string, entityType: string, entityId?: any, details?: any, before?: any, after?: any) {
   try {
     await storage.createAuditLogWithDiff({
-      userId: userId || null,
+      userId: userId ?? null,
       action,
       entityType,
-      entityId: entityId?.toString() || null,
+      entityId: entityId?.toString?.() ?? null,
       details,
-      diffBefore: diffBefore || null,
-      diffAfter: diffAfter || null,
+      diffBefore: before ?? null,
+      diffAfter: after ?? null,
     });
-  } catch (error) {
-    console.error("Failed to create audit log:", error);
+  } catch (err) {
+    console.error("Audit log error:", err);
   }
 }
 
-async function logLgpdAccess(
-  req: any,
-  accessType: "view" | "export" | "search",
-  dataCategory: "personal_data" | "sensitive_data" | "financial_data",
-  entityType: string,
-  entityId?: string | number,
-  details?: any
-) {
+async function logLgpdAccess(req: any, accessType: "view" | "export" | "search", dataCategory: string, entityType: string, entityId?: any, details?: any) {
   try {
-    const userId = req.user?.claims?.sub || null;
-    const ipAddress = req.ip || req.connection?.remoteAddress || null;
-    const userAgent = req.get("User-Agent") || null;
-    
+    const userId = req.user?.sub || null;
+
     await storage.createLgpdLog({
       userId,
       accessType,
       dataCategory,
       entityType,
-      entityId: entityId?.toString() || null,
-      ipAddress,
-      userAgent,
+      entityId: entityId?.toString?.() ?? null,
+      ipAddress: req.ip ?? null,
+      userAgent: req.get("User-Agent") ?? null,
       details,
     });
-  } catch (error) {
-    console.error("Failed to create LGPD log:", error);
+  } catch (err) {
+    console.error("LGPD log error:", err);
   }
 }
+
+/* ============================================================
+   REGISTER ROUTES
+   ============================================================ */
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  await setupAuth(app);
 
-  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
+/* ============================
+   AUTHENTICATED USER
+   ============================ */
+
+  app.get("/api/auth/user", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = await storage.getUser(req.user.id);
       res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
+    } catch (err) {
+      console.error(err);
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });
 
-  app.get("/api/dashboard/stats", isAuthenticated, async (_req, res) => {
+/* ============================
+   DASHBOARD BASIC
+   ============================ */
+
+  app.get("/api/dashboard/stats", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (_req, res) => {
     try {
       const stats = await storage.getDashboardStats();
       res.json(stats);
-    } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
+    } catch {
       res.status(500).json({ message: "Failed to fetch dashboard stats" });
     }
   });
 
-  app.get("/api/analytics/allocation-trends", isAuthenticated, async (req, res) => {
-    try {
-      const days = req.query.days ? parseInt(req.query.days as string) : 30;
-      const trends = await storage.getAllocationTrends(days);
-      res.json(trends);
-    } catch (error) {
-      console.error("Error fetching allocation trends:", error);
-      res.status(500).json({ message: "Failed to fetch allocation trends" });
-    }
-  });
+/* ============================
+   EMPLOYEES
+   ============================ */
 
-  app.get("/api/analytics/occurrences-by-category", isAuthenticated, async (_req, res) => {
-    try {
-      const data = await storage.getOccurrencesByCategory();
-      res.json(data);
-    } catch (error) {
-      console.error("Error fetching occurrences by category:", error);
-      res.status(500).json({ message: "Failed to fetch occurrences by category" });
-    }
-  });
-
-  app.get("/api/analytics/compliance-metrics", isAuthenticated, async (_req, res) => {
-    try {
-      const metrics = await storage.getComplianceMetrics();
-      res.json(metrics);
-    } catch (error) {
-      console.error("Error fetching compliance metrics:", error);
-      res.status(500).json({ message: "Failed to fetch compliance metrics" });
-    }
-  });
-
-  app.get("/api/analytics/activity-execution-stats", isAuthenticated, async (_req, res) => {
-    try {
-      const stats = await storage.getActivityExecutionStats();
-      res.json(stats);
-    } catch (error) {
-      console.error("Error fetching activity execution stats:", error);
-      res.status(500).json({ message: "Failed to fetch activity execution stats" });
-    }
-  });
-
-  app.get("/api/employees", isAuthenticated, async (req: any, res) => {
+  app.get("/api/employees", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const { search } = req.query;
-      const employeesList = search
-        ? await storage.searchEmployees(search as string)
-        : await storage.getEmployees();
-      
-      // LGPD logging for personal data access
-      if (search) {
-        await logLgpdAccess(req, "search", "personal_data", "employees_search", undefined, { searchTerm: search, resultCount: employeesList.length });
-      } else {
-        await logLgpdAccess(req, "view", "personal_data", "employees_list", undefined, { count: employeesList.length });
-      }
-      
-      res.json(employeesList);
-    } catch (error) {
-      console.error("Error fetching employees:", error);
+
+      const employees =
+        search ? await storage.searchEmployees(search) : await storage.getEmployees();
+
+      await logLgpdAccess(req, "view", "personal_data", "employees_list", undefined, {
+        count: employees.length,
+      });
+
+      res.json(employees);
+    } catch (err) {
+      console.error(err);
       res.status(500).json({ message: "Failed to fetch employees" });
     }
   });
 
-  app.get("/api/employees/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/employees/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const employee = await storage.getEmployee(id);
-      if (!employee) {
-        return res.status(404).json({ message: "Employee not found" });
-      }
-      
-      // LGPD logging for personal data access
-      await logLgpdAccess(req, "view", "personal_data", "employee", id, { employeeName: employee.name });
-      
+
+      if (!employee) return res.status(404).json({ message: "Employee not found" });
+
+      await logLgpdAccess(req, "view", "personal_data", "employee", id, {
+        employee: employee.name,
+      });
+
       res.json(employee);
-    } catch (error) {
-      console.error("Error fetching employee:", error);
+    } catch {
       res.status(500).json({ message: "Failed to fetch employee" });
     }
   });
 
-  app.post("/api/employees", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.post("/api/employees", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const parsed = insertEmployeeSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
-      }
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
       const employee = await storage.createEmployee(parsed.data);
-      await logAction(req.user?.claims?.sub, "create", "employee", employee.id, { name: employee.name });
+
+      await logAction(req.user.id, "create", "employee", employee.id, {
+        name: employee.name,
+      });
+
       res.status(201).json(employee);
-    } catch (error: any) {
-      console.error("Error creating employee:", error);
-      if (error.code === "23505") {
+    } catch (err: any) {
+      if (err.code === "23505") {
         return res.status(400).json({ message: "CPF already exists" });
       }
       res.status(500).json({ message: "Failed to create employee" });
     }
   });
 
-  app.patch("/api/employees/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.patch("/api/employees/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+
       const before = await storage.getEmployee(id);
-      if (!before) {
-        return res.status(404).json({ message: "Employee not found" });
-      }
-      const employee = await storage.updateEmployee(id, req.body);
-      if (!employee) {
-        return res.status(404).json({ message: "Employee not found" });
-      }
-      await logAction(req.user?.claims?.sub, "update", "employee", id, req.body, before, employee);
-      res.json(employee);
-    } catch (error: any) {
-      console.error("Error updating employee:", error);
-      if (error.code === "23505") {
-        return res.status(400).json({ message: "CPF already exists" });
-      }
+      if (!before) return res.status(404).json({ message: "Not found" });
+
+      const updated = await storage.updateEmployee(id, req.body);
+
+      await logAction(req.user.id, "update", "employee", id, req.body, before, updated);
+
+      res.json(updated);
+    } catch {
       res.status(500).json({ message: "Failed to update employee" });
     }
   });
 
-  app.delete("/api/employees/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.delete("/api/employees/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+
       const before = await storage.getEmployee(id);
-      if (!before) {
-        return res.status(404).json({ message: "Employee not found" });
-      }
-      const deleted = await storage.deleteEmployee(id);
-      if (!deleted) {
-        return res.status(404).json({ message: "Employee not found" });
-      }
-      await logAction(req.user?.claims?.sub, "delete", "employee", id, null, before, null);
+      if (!before) return res.status(404).json({ message: "Not found" });
+
+      await storage.deleteEmployee(id);
+
+      await logAction(req.user.id, "delete", "employee", id, null, before, null);
+
       res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting employee:", error);
+    } catch {
       res.status(500).json({ message: "Failed to delete employee" });
     }
   });
 
-  app.get("/api/service-posts", isAuthenticated, async (req, res) => {
+/* ============================
+   SERVICE POSTS
+   ============================ */
+
+  app.get("/api/service-posts", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req, res) => {
     try {
       const { search } = req.query;
+
       const posts = search
         ? await storage.searchServicePosts(search as string)
         : await storage.getServicePosts();
+
       res.json(posts);
-    } catch (error) {
-      console.error("Error fetching service posts:", error);
+    } catch (err) {
+      console.error(err);
       res.status(500).json({ message: "Failed to fetch service posts" });
     }
   });
 
-  app.get("/api/service-posts/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/service-posts/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const post = await storage.getServicePost(id);
-      if (!post) {
-        return res.status(404).json({ message: "Service post not found" });
-      }
+
+      if (!post) return res.status(404).json({ message: "Service post not found" });
+
       res.json(post);
-    } catch (error) {
-      console.error("Error fetching service post:", error);
+    } catch {
       res.status(500).json({ message: "Failed to fetch service post" });
     }
   });
 
-  app.post("/api/service-posts", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.post("/api/service-posts", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const parsed = insertServicePostSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
-      }
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
       const post = await storage.createServicePost(parsed.data);
-      await logAction(req.user?.claims?.sub, "create", "service_post", post.id, { postCode: post.postCode });
+
+      await logAction(req.user.id, "create", "service_post", post.id, {
+        postCode: post.postCode,
+      });
+
       res.status(201).json(post);
-    } catch (error: any) {
-      console.error("Error creating service post:", error);
-      if (error.code === "23505") {
+    } catch (err: any) {
+      if (err.code === "23505") {
         return res.status(400).json({ message: "Post code already exists" });
       }
       res.status(500).json({ message: "Failed to create service post" });
     }
   });
 
-  app.patch("/api/service-posts/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.patch("/api/service-posts/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+
       const before = await storage.getServicePost(id);
-      if (!before) {
-        return res.status(404).json({ message: "Service post not found" });
-      }
-      const post = await storage.updateServicePost(id, req.body);
-      if (!post) {
-        return res.status(404).json({ message: "Service post not found" });
-      }
-      await logAction(req.user?.claims?.sub, "update", "service_post", id, req.body, before, post);
-      res.json(post);
-    } catch (error: any) {
-      console.error("Error updating service post:", error);
-      if (error.code === "23505") {
-        return res.status(400).json({ message: "Post code already exists" });
-      }
+      if (!before) return res.status(404).json({ message: "Not found" });
+
+      const updated = await storage.updateServicePost(id, req.body);
+
+      await logAction(req.user.id, "update", "service_post", id, req.body, before, updated);
+
+      res.json(updated);
+    } catch {
       res.status(500).json({ message: "Failed to update service post" });
     }
   });
 
-  app.delete("/api/service-posts/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.delete("/api/service-posts/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+
       const before = await storage.getServicePost(id);
-      if (!before) {
-        return res.status(404).json({ message: "Service post not found" });
-      }
-      const deleted = await storage.deleteServicePost(id);
-      if (!deleted) {
-        return res.status(404).json({ message: "Service post not found" });
-      }
-      await logAction(req.user?.claims?.sub, "delete", "service_post", id, null, before, null);
+      if (!before) return res.status(404).json({ message: "Not found" });
+
+      await storage.deleteServicePost(id);
+
+      await logAction(req.user.id, "delete", "service_post", id, null, before, null);
+
       res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting service post:", error);
+    } catch {
       res.status(500).json({ message: "Failed to delete service post" });
     }
   });
 
-  app.get("/api/allocations", isAuthenticated, async (req: any, res) => {
+/* ============================
+   ALLOCATIONS
+   ============================ */
+
+  app.get("/api/allocations", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const { date, employeeId, postId, startDate, endDate } = req.query;
-      let allocationsList;
+
+      let allocations;
+
       if (startDate && endDate) {
-        allocationsList = await storage.getAllocationsByDateRange(
+        allocations = await storage.getAllocationsByDateRange(
           startDate as string,
           endDate as string
         );
       } else {
-        allocationsList = await storage.getAllocations({
+        allocations = await storage.getAllocations({
           date: date as string | undefined,
           employeeId: employeeId ? parseInt(employeeId as string) : undefined,
           postId: postId ? parseInt(postId as string) : undefined,
         });
       }
-      
-      // LGPD logging for allocation data access (contains employee info)
-      await logLgpdAccess(req, "view", "personal_data", "allocations_list", undefined, { count: allocationsList.length, filters: { date, employeeId, postId, startDate, endDate } });
-      res.json(allocationsList);
-    } catch (error) {
-      console.error("Error fetching allocations:", error);
+
+      await logLgpdAccess(req, "view", "personal_data", "allocations_list", undefined, {
+        count: allocations.length,
+      });
+
+      res.json(allocations);
+    } catch (err) {
+      console.error(err);
       res.status(500).json({ message: "Failed to fetch allocations" });
     }
   });
 
-  app.get("/api/allocations/:id", isAuthenticated, async (req: any, res) => {
+    app.get("/api/allocations/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const allocation = await storage.getAllocation(id);
-      if (!allocation) {
-        return res.status(404).json({ message: "Allocation not found" });
-      }
-      
-      // LGPD logging for allocation detail access
-      await logLgpdAccess(req, "view", "personal_data", "allocation", id, { employeeId: allocation.employeeId, date: allocation.date });
-      
+
+      if (!allocation) return res.status(404).json({ message: "Allocation not found" });
+
+      await logLgpdAccess(req, "view", "personal_data", "allocation", id, {
+        employeeId: allocation.employeeId,
+        date: allocation.date,
+      });
+
       res.json(allocation);
-    } catch (error) {
-      console.error("Error fetching allocation:", error);
+    } catch {
       res.status(500).json({ message: "Failed to fetch allocation" });
     }
   });
 
-  app.post("/api/allocations", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.post("/api/allocations", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const parsed = insertAllocationSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
-      }
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
       const allocation = await storage.createAllocation(parsed.data);
-      await logAction(req.user?.claims?.sub, "create", "allocation", allocation.id);
+
+      await logAction(req.user.id, "create", "allocation", allocation.id);
+
       res.status(201).json(allocation);
-    } catch (error) {
-      console.error("Error creating allocation:", error);
+    } catch {
       res.status(500).json({ message: "Failed to create allocation" });
     }
   });
 
-  app.patch("/api/allocations/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.patch("/api/allocations/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+
       const before = await storage.getAllocation(id);
-      if (!before) {
-        return res.status(404).json({ message: "Allocation not found" });
-      }
-      const allocation = await storage.updateAllocation(id, req.body);
-      if (!allocation) {
-        return res.status(404).json({ message: "Allocation not found" });
-      }
-      await logAction(req.user?.claims?.sub, "update", "allocation", id, req.body, before, allocation);
-      res.json(allocation);
-    } catch (error) {
-      console.error("Error updating allocation:", error);
+      if (!before) return res.status(404).json({ message: "Not found" });
+
+      const updated = await storage.updateAllocation(id, req.body);
+
+      await logAction(req.user.id, "update", "allocation", id, req.body, before, updated);
+
+      res.json(updated);
+    } catch {
       res.status(500).json({ message: "Failed to update allocation" });
     }
   });
 
-  app.delete("/api/allocations/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.delete("/api/allocations/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+
       const before = await storage.getAllocation(id);
-      if (!before) {
-        return res.status(404).json({ message: "Allocation not found" });
-      }
-      const deleted = await storage.deleteAllocation(id);
-      if (!deleted) {
-        return res.status(404).json({ message: "Allocation not found" });
-      }
-      await logAction(req.user?.claims?.sub, "delete", "allocation", id, null, before, null);
+      if (!before) return res.status(404).json({ message: "Not found" });
+
+      await storage.deleteAllocation(id);
+
+      await logAction(req.user.id, "delete", "allocation", id, null, before, null);
+
       res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting allocation:", error);
+    } catch {
       res.status(500).json({ message: "Failed to delete allocation" });
     }
   });
 
-  app.post("/api/allocations/copy-month", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const { sourceMonth, targetMonth, postId } = req.body;
-      
-      if (!sourceMonth || !targetMonth || !postId) {
-        return res.status(400).json({ message: "sourceMonth, targetMonth, and postId are required" });
-      }
-
-      const parsedPostId = parseInt(postId);
-      if (isNaN(parsedPostId) || parsedPostId <= 0) {
-        return res.status(400).json({ message: "Invalid postId" });
-      }
-
-      if (!/^\d{4}-\d{2}$/.test(sourceMonth) || !/^\d{4}-\d{2}$/.test(targetMonth)) {
-        return res.status(400).json({ message: "Invalid month format. Use YYYY-MM" });
-      }
-
-      if (sourceMonth === targetMonth) {
-        return res.status(400).json({ message: "Source and target months must be different" });
-      }
-
-      const sourceStart = `${sourceMonth}-01`;
-      const sourceYear = parseInt(sourceMonth.split("-")[0]);
-      const sourceMonthNum = parseInt(sourceMonth.split("-")[1]);
-      const sourceDaysInMonth = new Date(sourceYear, sourceMonthNum, 0).getDate();
-      const sourceEnd = `${sourceMonth}-${String(sourceDaysInMonth).padStart(2, "0")}`;
-
-      const targetYear = parseInt(targetMonth.split("-")[0]);
-      const targetMonthNum = parseInt(targetMonth.split("-")[1]);
-      const targetDaysInMonth = new Date(targetYear, targetMonthNum, 0).getDate();
-      const targetStart = `${targetMonth}-01`;
-      const targetEnd = `${targetMonth}-${String(targetDaysInMonth).padStart(2, "0")}`;
-
-      const sourceAllocations = await storage.getAllocationsByDateRangeAndPost(
-        sourceStart,
-        sourceEnd,
-        parsedPostId
-      );
-
-      if (sourceAllocations.length === 0) {
-        return res.status(400).json({ message: "No allocations found in source month" });
-      }
-
-      await storage.deleteAllocationsByDateRangeAndPost(targetStart, targetEnd, parsedPostId);
-
-      const newAllocations = sourceAllocations.map((allocation) => {
-        const sourceDate = new Date(allocation.date);
-        const dayOfMonth = sourceDate.getDate();
-        const adjustedDay = Math.min(dayOfMonth, targetDaysInMonth);
-        const targetDate = `${targetMonth}-${String(adjustedDay).padStart(2, "0")}`;
-
-        return {
-          employeeId: allocation.employeeId,
-          postId: parsedPostId,
-          date: targetDate,
-          status: allocation.status,
-          notes: allocation.notes,
-        };
-      });
-
-      const uniqueAllocations = newAllocations.reduce((acc, curr) => {
-        const key = `${curr.employeeId}-${curr.date}`;
-        if (!acc.has(key)) {
-          acc.set(key, curr);
-        }
-        return acc;
-      }, new Map());
-
-      const created = await storage.bulkCreateAllocations(Array.from(uniqueAllocations.values()));
-      await logAction(req.user?.claims?.sub, "bulk_copy", "allocation", undefined, {
-        sourceMonth,
-        targetMonth,
-        postId,
-        count: created.length,
-      });
-
-      res.status(201).json({ message: "Allocations copied successfully", count: created.length });
-    } catch (error) {
-      console.error("Error copying allocations:", error);
-      res.status(500).json({ message: "Failed to copy allocations" });
-    }
-  });
+/* ============================
+   CSV IMPORT (ALLOCATIONS)
+   ============================ */
 
   app.post(
     "/api/allocations/import-csv",
-    isAuthenticated,
-    isAdmin,
+    authenticateJWT,
+    requireRole(["admin", "operador"]),
     upload.single("file"),
     async (req: any, res) => {
       try {
@@ -535,268 +412,200 @@ export async function registerRoutes(
           return res.status(400).json({ message: "No file uploaded" });
         }
 
-        const { postId, month } = req.body;
-        if (!postId || !month) {
-          fs.unlinkSync(req.file.path);
-          return res.status(400).json({ message: "postId and month are required" });
-        }
+        const { postId } = req.body;
 
         const parsedPostId = parseInt(postId);
-        if (isNaN(parsedPostId) || parsedPostId <= 0) {
+        if (isNaN(parsedPostId)) {
           fs.unlinkSync(req.file.path);
           return res.status(400).json({ message: "Invalid postId" });
         }
 
-        const fileContent = fs.readFileSync(req.file.path, "utf-8");
+        const content = fs.readFileSync(req.file.path, "utf-8");
         fs.unlinkSync(req.file.path);
 
-        const normalizedContent = fileContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-        const lines = normalizedContent.trim().split("\n");
+        const lines = content.trim().split("\n");
         if (lines.length < 2) {
-          return res.status(400).json({ message: "CSV file must have headers and at least one data row" });
+          return res.status(400).json({ message: "CSV must contain data rows" });
         }
 
-        const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/^["']|["']$/g, ""));
-        const employeeIdIndex = headers.findIndex((h) => h === "employee_id" || h === "employeeid");
-        const dateIndex = headers.findIndex((h) => h === "date");
-        const statusIndex = headers.findIndex((h) => h === "status");
+        const headers = lines[0].toLowerCase().split(",");
+        const empIdx = headers.indexOf("employee_id");
+        const dateIdx = headers.indexOf("date");
+        const statusIdx = headers.indexOf("status");
 
-        if (employeeIdIndex === -1 || dateIndex === -1 || statusIndex === -1) {
+        if (empIdx === -1 || dateIdx === -1 || statusIdx === -1) {
           return res.status(400).json({
-            message: "CSV must have columns: employee_id (or employeeid), date, status",
+            message: "CSV must have employee_id,date,status",
           });
         }
 
-        const validStatuses = ["present", "absent", "justified", "vacation", "medical_leave"];
-        const allocationsToCreate: any[] = [];
-        const errors: string[] = [];
+        const allocations = [];
 
         for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-
-          const values = line.split(",").map((v) => v.trim().replace(/^["']|["']$/g, ""));
-          const employeeId = parseInt(values[employeeIdIndex]);
-          const dateValue = values[dateIndex];
-          const statusValue = values[statusIndex]?.toLowerCase();
-
-          if (isNaN(employeeId) || employeeId <= 0) {
-            errors.push(`Row ${i + 1}: Invalid employee_id`);
-            continue;
-          }
-
-          if (!dateValue || !/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
-            errors.push(`Row ${i + 1}: Invalid date format (use YYYY-MM-DD)`);
-            continue;
-          }
-
-          if (!statusValue || !validStatuses.includes(statusValue)) {
-            errors.push(`Row ${i + 1}: Invalid status "${statusValue || 'empty'}". Valid: ${validStatuses.join(", ")}`);
-            continue;
-          }
-
-          allocationsToCreate.push({
-            employeeId,
+          const cols = lines[i].split(",");
+          allocations.push({
+            employeeId: parseInt(cols[empIdx]),
             postId: parsedPostId,
-            date: dateValue,
-            status: statusValue,
+            date: cols[dateIdx],
+            status: cols[statusIdx],
           });
         }
 
-        if (allocationsToCreate.length === 0) {
-          return res.status(400).json({
-            message: "No valid allocations found in CSV",
-            errors,
-          });
-        }
+        const created = await storage.bulkCreateAllocations(allocations);
 
-        const uniqueAllocations = allocationsToCreate.reduce((acc, curr) => {
-          const key = `${curr.employeeId}-${curr.date}`;
-          acc.set(key, curr);
-          return acc;
-        }, new Map());
-
-        const created = await storage.bulkCreateAllocations(Array.from(uniqueAllocations.values()));
-        await logAction(req.user?.claims?.sub, "bulk_import", "allocation", undefined, {
-          postId,
-          month,
+        await logAction(req.user.id, "bulk_import", "allocation", undefined, {
           count: created.length,
         });
 
-        res.status(201).json({
-          message: "CSV imported successfully",
-          imported: created.length,
-          errors: errors.length > 0 ? errors : undefined,
-        });
-      } catch (error) {
-        console.error("Error importing CSV:", error);
+        res.json({ imported: created.length });
+      } catch (err) {
+        console.error(err);
         res.status(500).json({ message: "Failed to import CSV" });
       }
     }
   );
 
-  app.get("/api/occurrences", isAuthenticated, async (req: any, res) => {
+/* ============================
+   OCCURRENCES
+   ============================ */
+
+  app.get("/api/occurrences", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const { startDate, endDate, category, employeeId } = req.query;
-      const occurrencesList = await storage.getOccurrences({
+
+      const occurrences = await storage.getOccurrences({
         startDate: startDate as string | undefined,
         endDate: endDate as string | undefined,
         category: category as string | undefined,
         employeeId: employeeId ? parseInt(employeeId as string) : undefined,
       });
-      
-      // LGPD logging for occurrence data access (may contain employee info)
-      await logLgpdAccess(req, "view", "personal_data", "occurrences_list", undefined, { count: occurrencesList.length, filters: { startDate, endDate, category, employeeId } });
-      
-      res.json(occurrencesList);
-    } catch (error) {
-      console.error("Error fetching occurrences:", error);
+
+      await logLgpdAccess(req, "view", "personal_data", "occurrences_list", undefined, {
+        count: occurrences.length,
+      });
+
+      res.json(occurrences);
+    } catch (err) {
+      console.error(err);
       res.status(500).json({ message: "Failed to fetch occurrences" });
     }
   });
 
-  app.get("/api/occurrences/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/occurrences/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const occurrence = await storage.getOccurrence(id);
+
       if (!occurrence) {
         return res.status(404).json({ message: "Occurrence not found" });
       }
-      
-      // LGPD logging for occurrence detail access
-      await logLgpdAccess(req, "view", "personal_data", "occurrence", id, { employeeId: occurrence.employeeId, date: occurrence.date });
-      
+
+      await logLgpdAccess(req, "view", "personal_data", "occurrence", id, {
+        employeeId: occurrence.employeeId,
+      });
+
       res.json(occurrence);
-    } catch (error) {
-      console.error("Error fetching occurrence:", error);
+    } catch {
       res.status(500).json({ message: "Failed to fetch occurrence" });
     }
   });
 
-  app.post("/api/occurrences", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.post("/api/occurrences", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const parsed = insertOccurrenceSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
-      }
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
       const occurrence = await storage.createOccurrence(parsed.data);
-      await logAction(req.user?.claims?.sub, "create", "occurrence", occurrence.id);
+
+      await logAction(req.user.id, "create", "occurrence", occurrence.id);
+
       res.status(201).json(occurrence);
-    } catch (error) {
-      console.error("Error creating occurrence:", error);
+    } catch {
       res.status(500).json({ message: "Failed to create occurrence" });
     }
   });
 
-  app.patch("/api/occurrences/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.patch("/api/occurrences/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+
       const before = await storage.getOccurrence(id);
-      if (!before) {
-        return res.status(404).json({ message: "Occurrence not found" });
-      }
-      const occurrence = await storage.updateOccurrence(id, req.body);
-      if (!occurrence) {
-        return res.status(404).json({ message: "Occurrence not found" });
-      }
-      await logAction(req.user?.claims?.sub, "update", "occurrence", id, req.body, before, occurrence);
-      res.json(occurrence);
-    } catch (error) {
-      console.error("Error updating occurrence:", error);
+      if (!before) return res.status(404).json({ message: "Not found" });
+
+      const updated = await storage.updateOccurrence(id, req.body);
+
+      await logAction(req.user.id, "update", "occurrence", id, req.body, before, updated);
+
+      res.json(updated);
+    } catch {
       res.status(500).json({ message: "Failed to update occurrence" });
     }
   });
 
-  app.delete("/api/occurrences/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.delete("/api/occurrences/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+
       const before = await storage.getOccurrence(id);
-      if (!before) {
-        return res.status(404).json({ message: "Occurrence not found" });
-      }
-      const deleted = await storage.deleteOccurrence(id);
-      if (!deleted) {
-        return res.status(404).json({ message: "Occurrence not found" });
-      }
-      await logAction(req.user?.claims?.sub, "delete", "occurrence", id, null, before, null);
+      if (!before) return res.status(404).json({ message: "Not found" });
+
+      await storage.deleteOccurrence(id);
+
+      await logAction(req.user.id, "delete", "occurrence", id, null, before, null);
+
       res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting occurrence:", error);
+    } catch {
       res.status(500).json({ message: "Failed to delete occurrence" });
     }
   });
 
-  app.get("/api/documents", isAuthenticated, async (req: any, res) => {
+  /* ============================
+   DOCUMENTS
+   ============================ */
+
+  app.get("/api/documents", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
-      const { documentType, employeeId, postId, monthYear } = req.query;
-      const documentsList = await storage.getDocuments({
-        documentType: documentType as string | undefined,
+      const { employeeId, postId, category, type } = req.query;
+
+      const documents = await storage.getDocuments({
         employeeId: employeeId ? parseInt(employeeId as string) : undefined,
         postId: postId ? parseInt(postId as string) : undefined,
-        monthYear: monthYear as string | undefined,
+        category: category as string | undefined,
+        type: type as string | undefined,
       });
-      
-      // LGPD logging for document access (may contain personal data)
-      await logLgpdAccess(req, "view", "personal_data", "documents_list", undefined, { count: documentsList.length, filters: { documentType, employeeId, postId, monthYear } });
-      
-      res.json(documentsList);
-    } catch (error) {
-      console.error("Error fetching documents:", error);
+
+      await logLgpdAccess(req, "view", "personal_data", "documents_list", undefined, {
+        count: documents.length,
+      });
+
+      res.json(documents);
+    } catch (err) {
+      console.error(err);
       res.status(500).json({ message: "Failed to fetch documents" });
     }
   });
 
-  app.get("/api/documents/expiring", isAuthenticated, async (req: any, res) => {
-    try {
-      const daysAhead = req.query.days ? parseInt(req.query.days as string) : 30;
-      const expiringDocs = await storage.getExpiringDocuments(daysAhead);
-      
-      // LGPD logging for expiring documents access
-      await logLgpdAccess(req, "view", "personal_data", "documents_expiring", undefined, { daysAhead, count: expiringDocs.length });
-      
-      res.json(expiringDocs);
-    } catch (error) {
-      console.error("Error fetching expiring documents:", error);
-      res.status(500).json({ message: "Failed to fetch expiring documents" });
-    }
-  });
-
-  app.get("/api/documents/expired", isAuthenticated, async (req: any, res) => {
-    try {
-      const expiredDocs = await storage.getExpiredDocuments();
-      
-      // LGPD logging for expired documents access
-      await logLgpdAccess(req, "view", "personal_data", "documents_expired", undefined, { count: expiredDocs.length });
-      
-      res.json(expiredDocs);
-    } catch (error) {
-      console.error("Error fetching expired documents:", error);
-      res.status(500).json({ message: "Failed to fetch expired documents" });
-    }
-  });
-
-  app.get("/api/documents/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/documents/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const document = await storage.getDocument(id);
+
       if (!document) {
         return res.status(404).json({ message: "Document not found" });
       }
-      
-      // LGPD logging for document access
-      await logLgpdAccess(req, "view", "personal_data", "document", id, { filename: document.originalName, documentType: document.documentType });
-      
+
+      await logLgpdAccess(req, "view", "sensitive_data", "document", id);
+
       res.json(document);
-    } catch (error) {
-      console.error("Error fetching document:", error);
+    } catch {
       res.status(500).json({ message: "Failed to fetch document" });
     }
   });
 
   app.post(
-    "/api/documents/upload",
-    isAuthenticated,
-    isAdmin,
+    "/api/documents",
+    authenticateJWT,
+    requireRole(["admin", "operador"]),
     upload.single("file"),
     async (req: any, res) => {
       try {
@@ -804,37 +613,38 @@ export async function registerRoutes(
           return res.status(400).json({ message: "No file uploaded" });
         }
 
-        const { documentType, employeeId, postId, monthYear, expirationDate } = req.body;
+        const parsed = insertDocumentSchema.safeParse(req.body);
+        if (!parsed.success) {
+          fs.unlinkSync(req.file.path);
+          return res.status(400).json(parsed.error);
+        }
 
-        const document = await storage.createDocument({
-          filename: req.file.filename,
-          originalName: req.file.originalname,
-          mimeType: req.file.mimetype,
+        const filePath = req.file.path.replace(/\\/g, "/");
+
+        const doc = await storage.createDocument({
+          ...parsed.data,
+          path: filePath,
           size: req.file.size,
-          path: req.file.path,
-          documentType: documentType || "other",
-          employeeId: employeeId ? parseInt(employeeId) : null,
-          postId: postId ? parseInt(postId) : null,
-          monthYear: monthYear || null,
-          expirationDate: expirationDate || null,
-          uploadedBy: req.user?.claims?.sub || null,
+          mimeType: req.file.mimetype,
+          originalName: req.file.originalname,
+          uploadedBy: req.user.id,
         });
 
-        await logAction(req.user?.claims?.sub, "upload", "document", document.id, {
-          filename: document.originalName,
-        });
-        res.status(201).json(document);
-      } catch (error) {
-        console.error("Error uploading document:", error);
+        await logAction(req.user.id, "create", "document", doc.id);
+
+        res.status(201).json(doc);
+      } catch (err) {
+        console.error(err);
         res.status(500).json({ message: "Failed to upload document" });
       }
     }
   );
 
-  app.get("/api/documents/:id/download", isAuthenticated, async (req: any, res) => {
+  app.get("/api/documents/:id/download", authenticateJWT, requireRole(["admin", "fiscal"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const document = await storage.getDocument(id);
+
       if (!document) {
         return res.status(404).json({ message: "Document not found" });
       }
@@ -842,1209 +652,221 @@ export async function registerRoutes(
       if (!fs.existsSync(document.path)) {
         return res.status(404).json({ message: "File not found" });
       }
-      
-      // LGPD logging for document download (export of personal data)
-      await logLgpdAccess(req, "export", "personal_data", "document_download", id, { filename: document.originalName, documentType: document.documentType });
+
+      await logLgpdAccess(req, "export", "sensitive_data", "document", id);
 
       res.download(document.path, document.originalName);
-    } catch (error) {
-      console.error("Error downloading document:", error);
+    } catch {
       res.status(500).json({ message: "Failed to download document" });
     }
   });
 
-  app.delete("/api/documents/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.patch("/api/documents/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
-      const document = await storage.getDocument(id);
-      if (!document) {
-        return res.status(404).json({ message: "Document not found" });
-      }
 
-      if (fs.existsSync(document.path)) {
-        fs.unlinkSync(document.path);
-      }
+      const before = await storage.getDocument(id);
+      if (!before) return res.status(404).json({ message: "Not found" });
 
-      await storage.deleteDocument(id);
-      await logAction(req.user?.claims?.sub, "delete", "document", id);
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting document:", error);
-      res.status(500).json({ message: "Failed to delete document" });
-    }
-  });
+      const updated = await storage.updateDocument(id, req.body);
 
-  app.patch("/api/documents/:id", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { expirationDate } = req.body;
-      
-      const document = await storage.updateDocument(id, { expirationDate: expirationDate || null });
-      if (!document) {
-        return res.status(404).json({ message: "Document not found" });
-      }
-      await logAction(req.user?.claims?.sub, "update", "document", id, { expirationDate });
-      res.json(document);
-    } catch (error) {
-      console.error("Error updating document:", error);
+      await logAction(req.user.id, "update", "document", id, req.body, before, updated);
+
+      res.json(updated);
+    } catch {
       res.status(500).json({ message: "Failed to update document" });
     }
   });
 
-  app.get("/api/users", isAuthenticated, isAdmin, async (_req, res) => {
-    try {
-      const usersList = await storage.getAllUsers();
-      res.json(usersList);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      res.status(500).json({ message: "Failed to fetch users" });
-    }
-  });
-
-  app.patch("/api/users/:id/role", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const { id } = req.params;
-      const { role } = req.body;
-      if (!["admin", "viewer"].includes(role)) {
-        return res.status(400).json({ message: "Invalid role" });
-      }
-      const user = await storage.updateUserRole(id, role);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      await logAction(req.user?.claims?.sub, "update_role", "user", id, { role });
-      res.json(user);
-    } catch (error) {
-      console.error("Error updating user role:", error);
-      res.status(500).json({ message: "Failed to update user role" });
-    }
-  });
-
-  app.get("/api/audit-logs", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
-      const logs = await storage.getAuditLogs(limit);
-      res.json(logs);
-    } catch (error) {
-      console.error("Error fetching audit logs:", error);
-      res.status(500).json({ message: "Failed to fetch audit logs" });
-    }
-  });
-
-  app.get("/api/notification-settings", isAuthenticated, isAdmin, async (_req, res) => {
-    try {
-      const settings = await storage.getNotificationSettings();
-      res.json(settings);
-    } catch (error) {
-      console.error("Error fetching notification settings:", error);
-      res.status(500).json({ message: "Failed to fetch notification settings" });
-    }
-  });
-
-  app.get("/api/notification-settings/my", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user?.claims?.sub;
-      const settings = await storage.getNotificationSettingsByUser(userId);
-      res.json(settings || null);
-    } catch (error) {
-      console.error("Error fetching user notification settings:", error);
-      res.status(500).json({ message: "Failed to fetch notification settings" });
-    }
-  });
-
-  app.post("/api/notification-settings", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const parsed = insertNotificationSettingsSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
-      }
-      const settings = await storage.createNotificationSettings(parsed.data);
-      await logAction(req.user?.claims?.sub, "create", "notification_settings", settings.id);
-      res.status(201).json(settings);
-    } catch (error) {
-      console.error("Error creating notification settings:", error);
-      res.status(500).json({ message: "Failed to create notification settings" });
-    }
-  });
-
-  app.patch("/api/notification-settings/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.delete("/api/documents/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
-      const settings = await storage.updateNotificationSettings(id, req.body);
-      if (!settings) {
-        return res.status(404).json({ message: "Notification settings not found" });
-      }
-      await logAction(req.user?.claims?.sub, "update", "notification_settings", id, req.body);
-      res.json(settings);
-    } catch (error) {
-      console.error("Error updating notification settings:", error);
-      res.status(500).json({ message: "Failed to update notification settings" });
-    }
-  });
 
-  app.delete("/api/notification-settings/:id", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const deleted = await storage.deleteNotificationSettings(id);
-      if (!deleted) {
-        return res.status(404).json({ message: "Notification settings not found" });
+      const before = await storage.getDocument(id);
+      if (!before) return res.status(404).json({ message: "Not found" });
+
+      if (fs.existsSync(before.path)) {
+        fs.unlinkSync(before.path);
       }
-      await logAction(req.user?.claims?.sub, "delete", "notification_settings", id);
+
+      await storage.deleteDocument(id);
+
+      await logAction(req.user.id, "delete", "document", id, null, before, null);
+
       res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting notification settings:", error);
-      res.status(500).json({ message: "Failed to delete notification settings" });
+    } catch {
+      res.status(500).json({ message: "Failed to delete document" });
     }
   });
 
-  app.get("/api/notifications/status", isAuthenticated, async (_req, res) => {
+/* ============================
+   DOCUMENT CHECKLISTS
+   ============================ */
+
+  app.get("/api/document-checklists", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (_req, res) => {
     try {
-      res.json({
-        emailServiceConfigured: emailService.isReady(),
-        smtpConfigured: !!process.env.SMTP_HOST,
-      });
-    } catch (error) {
-      console.error("Error checking notification status:", error);
-      res.status(500).json({ message: "Failed to check notification status" });
-    }
-  });
-
-  app.post("/api/notifications/test", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ message: "Email address is required" });
-      }
-
-      if (!emailService.isReady()) {
-        return res.status(400).json({ 
-          message: "Email service not configured. Please set SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS environment variables." 
-        });
-      }
-
-      const sent = await emailService.sendEmail({
-        to: email,
-        subject: "Test Notification - Contract Management System",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #1a365d;">Test Notification</h2>
-            <p>This is a test email from the Contract Management System.</p>
-            <p>If you received this, your email notifications are configured correctly.</p>
-          </div>
-        `,
-        text: "This is a test email from the Contract Management System.",
-      });
-
-      if (sent) {
-        res.json({ message: "Test email sent successfully" });
-      } else {
-        res.status(500).json({ message: "Failed to send test email" });
-      }
-    } catch (error) {
-      console.error("Error sending test notification:", error);
-      res.status(500).json({ message: "Failed to send test notification" });
-    }
-  });
-
-  app.post("/api/notifications/send-document-expiration", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      if (!emailService.isReady()) {
-        return res.status(400).json({ message: "Email service not configured" });
-      }
-
-      const recipients = await storage.getActiveNotificationRecipients('documents');
-      if (recipients.length === 0) {
-        return res.status(400).json({ message: "No recipients configured for document expiration notifications" });
-      }
-
-      const expiredDocs = await storage.getExpiredDocuments();
-      const expiringDocs = await storage.getExpiringDocuments(30);
-
-      if (expiredDocs.length === 0 && expiringDocs.length === 0) {
-        return res.json({ message: "No expired or expiring documents to notify about" });
-      }
-
-      const today = new Date();
-      const documents = [
-        ...expiredDocs.map(doc => ({
-          documentType: doc.documentType,
-          originalName: doc.originalName,
-          expirationDate: doc.expirationDate || '',
-          employeeName: doc.employee?.name,
-          postName: doc.post?.postName,
-          daysUntilExpiration: doc.expirationDate 
-            ? Math.floor((new Date(doc.expirationDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-            : 0,
-        })),
-        ...expiringDocs.map(doc => ({
-          documentType: doc.documentType,
-          originalName: doc.originalName,
-          expirationDate: doc.expirationDate || '',
-          employeeName: doc.employee?.name,
-          postName: doc.post?.postName,
-          daysUntilExpiration: doc.expirationDate 
-            ? Math.floor((new Date(doc.expirationDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-            : 0,
-        })),
-      ];
-
-      let sentCount = 0;
-      for (const recipient of recipients) {
-        const sent = await emailService.sendDocumentExpirationNotification(recipient, documents);
-        if (sent) sentCount++;
-      }
-
-      await logAction(req.user?.claims?.sub, "send_notification", "document_expiration", undefined, {
-        recipientCount: recipients.length,
-        sentCount,
-        expiredCount: expiredDocs.length,
-        expiringCount: expiringDocs.length,
-      });
-
-      res.json({ 
-        message: `Document expiration notifications sent to ${sentCount} of ${recipients.length} recipients`,
-        expiredDocuments: expiredDocs.length,
-        expiringDocuments: expiringDocs.length,
-      });
-    } catch (error) {
-      console.error("Error sending document expiration notifications:", error);
-      res.status(500).json({ message: "Failed to send document expiration notifications" });
-    }
-  });
-
-  app.post("/api/notifications/send-daily-summary", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      if (!emailService.isReady()) {
-        return res.status(400).json({ message: "Email service not configured" });
-      }
-
-      const recipients = await storage.getActiveNotificationRecipients('daily');
-      if (recipients.length === 0) {
-        return res.status(400).json({ message: "No recipients configured for daily summary notifications" });
-      }
-
-      const today = new Date().toISOString().split('T')[0];
-      const stats = await storage.getDashboardStats();
-      const expiredDocs = await storage.getExpiredDocuments();
-      const expiringDocs = await storage.getExpiringDocuments(30);
-
-      const summary = {
-        date: today,
-        newOccurrences: stats.recentOccurrences,
-        missingAllocations: 0,
-        expiredDocuments: expiredDocs.length,
-        expiringDocuments: expiringDocs.length,
-      };
-
-      let sentCount = 0;
-      for (const recipient of recipients) {
-        const sent = await emailService.sendDailySummaryNotification(recipient, summary);
-        if (sent) sentCount++;
-      }
-
-      await logAction(req.user?.claims?.sub, "send_notification", "daily_summary", undefined, {
-        recipientCount: recipients.length,
-        sentCount,
-        summary,
-      });
-
-      res.json({ 
-        message: `Daily summary sent to ${sentCount} of ${recipients.length} recipients`,
-        summary,
-      });
-    } catch (error) {
-      console.error("Error sending daily summary:", error);
-      res.status(500).json({ message: "Failed to send daily summary" });
-    }
-  });
-
-  // Admin Audit Logs Routes
-  app.get("/api/admin/audit-logs", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const { userId, entityType, action, startDate, endDate, limit } = req.query;
-      const logs = await storage.getAuditLogsFiltered({
-        userId: userId as string | undefined,
-        entityType: entityType as string | undefined,
-        action: action as string | undefined,
-        startDate: startDate as string | undefined,
-        endDate: endDate as string | undefined,
-        limit: limit ? parseInt(limit as string) : undefined,
-      });
-      res.json(logs);
-    } catch (error) {
-      console.error("Error fetching audit logs:", error);
-      res.status(500).json({ message: "Failed to fetch audit logs" });
-    }
-  });
-
-  app.get("/api/admin/audit-logs/export", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const { userId, entityType, action, startDate, endDate } = req.query;
-      const logs = await storage.getAuditLogsFiltered({
-        userId: userId as string | undefined,
-        entityType: entityType as string | undefined,
-        action: action as string | undefined,
-        startDate: startDate as string | undefined,
-        endDate: endDate as string | undefined,
-        limit: 10000,
-      });
-
-      // LGPD logging for audit log export
-      await logLgpdAccess(req, "export", "sensitive_data", "audit_logs_export", undefined, { count: logs.length, filters: { userId, entityType, action, startDate, endDate } });
-
-      const csvHeader = "ID,Data/Hora,Usuário,Ação,Entidade,ID Entidade,Detalhes\n";
-      const csvRows = logs.map(log => {
-        const timestamp = log.timestamp ? new Date(log.timestamp).toLocaleString('pt-BR') : '';
-        const userName = log.user ? `${log.user.firstName || ''} ${log.user.lastName || ''}`.trim() : 'Sistema';
-        const details = log.details ? JSON.stringify(log.details).replace(/"/g, '""') : '';
-        return `${log.id},"${timestamp}","${userName}","${log.action}","${log.entityType}","${log.entityId || ''}","${details}"`;
-      }).join("\n");
-
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename=audit_logs_${new Date().toISOString().split('T')[0]}.csv`);
-      res.send('\uFEFF' + csvHeader + csvRows);
-    } catch (error) {
-      console.error("Error exporting audit logs:", error);
-      res.status(500).json({ message: "Failed to export audit logs" });
-    }
-  });
-
-  app.get("/api/admin/audit-logs/entity-types", isAuthenticated, isAdmin, async (_req, res) => {
-    try {
-      const entityTypes = ["employee", "service_post", "allocation", "occurrence", "document", "user", "notification_settings", "alert"];
-      res.json(entityTypes);
-    } catch (error) {
-      console.error("Error fetching entity types:", error);
-      res.status(500).json({ message: "Failed to fetch entity types" });
-    }
-  });
-
-  app.get("/api/admin/audit-logs/actions", isAuthenticated, isAdmin, async (_req, res) => {
-    try {
-      const actions = ["create", "update", "delete", "bulk_copy", "bulk_import", "send_notification", "mark_treated", "resolve"];
-      res.json(actions);
-    } catch (error) {
-      console.error("Error fetching actions:", error);
-      res.status(500).json({ message: "Failed to fetch actions" });
-    }
-  });
-
-  // Admin LGPD Logs Routes
-  app.get("/api/admin/lgpd-logs", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const { userId, accessType, dataCategory, entityType, startDate, endDate, limit } = req.query;
-      const logs = await storage.getLgpdLogsFiltered({
-        userId: userId as string | undefined,
-        accessType: accessType as string | undefined,
-        dataCategory: dataCategory as string | undefined,
-        entityType: entityType as string | undefined,
-        startDate: startDate as string | undefined,
-        endDate: endDate as string | undefined,
-        limit: limit ? parseInt(limit as string) : undefined,
-      });
-      res.json(logs);
-    } catch (error) {
-      console.error("Error fetching LGPD logs:", error);
-      res.status(500).json({ message: "Failed to fetch LGPD logs" });
-    }
-  });
-
-  app.get("/api/admin/lgpd-logs/export", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const { userId, accessType, dataCategory, entityType, startDate, endDate } = req.query;
-      const logs = await storage.getLgpdLogsFiltered({
-        userId: userId as string | undefined,
-        accessType: accessType as string | undefined,
-        dataCategory: dataCategory as string | undefined,
-        entityType: entityType as string | undefined,
-        startDate: startDate as string | undefined,
-        endDate: endDate as string | undefined,
-        limit: 10000,
-      });
-
-      // LGPD logging for LGPD logs export (meta-logging)
-      await logLgpdAccess(req, "export", "sensitive_data", "lgpd_logs_export", undefined, { count: logs.length, filters: { userId, accessType, dataCategory, entityType, startDate, endDate } });
-
-      const csvHeader = "ID,Data/Hora,Usuário,Tipo de Acesso,Categoria de Dados,Entidade,ID Entidade,Endereço IP,Detalhes\n";
-      const csvRows = logs.map(log => {
-        const timestamp = log.timestamp ? new Date(log.timestamp).toLocaleString('pt-BR') : '';
-        const userName = log.user ? `${log.user.firstName || ''} ${log.user.lastName || ''}`.trim() : 'Sistema';
-        const details = log.details ? JSON.stringify(log.details).replace(/"/g, '""') : '';
-        return `${log.id},"${timestamp}","${userName}","${log.accessType}","${log.dataCategory}","${log.entityType}","${log.entityId || ''}","${log.ipAddress || ''}","${details}"`;
-      }).join("\n");
-
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename=lgpd_logs_${new Date().toISOString().split('T')[0]}.csv`);
-      res.send('\uFEFF' + csvHeader + csvRows);
-    } catch (error) {
-      console.error("Error exporting LGPD logs:", error);
-      res.status(500).json({ message: "Failed to export LGPD logs" });
-    }
-  });
-
-  app.get("/api/admin/lgpd-logs/access-types", isAuthenticated, isAdmin, async (_req, res) => {
-    try {
-      const accessTypes = ["view", "export", "search"];
-      res.json(accessTypes);
-    } catch (error) {
-      console.error("Error fetching access types:", error);
-      res.status(500).json({ message: "Failed to fetch access types" });
-    }
-  });
-
-  app.get("/api/admin/lgpd-logs/data-categories", isAuthenticated, isAdmin, async (_req, res) => {
-    try {
-      const dataCategories = ["personal_data", "sensitive_data", "financial_data"];
-      res.json(dataCategories);
-    } catch (error) {
-      console.error("Error fetching data categories:", error);
-      res.status(500).json({ message: "Failed to fetch data categories" });
-    }
-  });
-
-  app.get("/api/admin/lgpd-logs/entity-types", isAuthenticated, isAdmin, async (_req, res) => {
-    try {
-      const entityTypes = [
-        "employee", "employees_list", "employees_search",
-        "allocation", "allocations_list",
-        "occurrence", "occurrences_list",
-        "document", "documents_list", "document_download", "documents_expiring", "documents_expired",
-        "audit_logs_export", "lgpd_logs_export"
-      ];
-      res.json(entityTypes);
-    } catch (error) {
-      console.error("Error fetching entity types:", error);
-      res.status(500).json({ message: "Failed to fetch entity types" });
-    }
-  });
-
-  app.get("/api/reports/previsto-realizado", isAuthenticated, async (req, res) => {
-    try {
-      const { startDate, endDate, postId } = req.query;
-
-      if (!startDate || !endDate) {
-        return res.status(400).json({ message: "startDate and endDate are required" });
-      }
-
-      const report = await storage.getPrevistoRealizadoReport({
-        startDate: startDate as string,
-        endDate: endDate as string,
-        postId: postId ? parseInt(postId as string) : undefined,
-      });
-
-      res.json(report);
-    } catch (error) {
-      console.error("Error fetching previsto-realizado report:", error);
-      res.status(500).json({ message: "Failed to fetch previsto-realizado report" });
-    }
-  });
-
-  // Document Checklists Routes
-  app.get("/api/document-checklists", isAuthenticated, async (req, res) => {
-    try {
-      const { postId } = req.query;
-      const checklists = await storage.getDocumentChecklists(
-        postId ? parseInt(postId as string) : undefined
-      );
-      res.json(checklists);
-    } catch (error) {
-      console.error("Error fetching document checklists:", error);
+      const items = await storage.getDocumentChecklists();
+      res.json(items);
+    } catch {
       res.status(500).json({ message: "Failed to fetch document checklists" });
     }
   });
 
-  app.get("/api/document-checklists/:id", isAuthenticated, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const checklist = await storage.getDocumentChecklist(id);
-      if (!checklist) {
-        return res.status(404).json({ message: "Document checklist not found" });
-      }
-      res.json(checklist);
-    } catch (error) {
-      console.error("Error fetching document checklist:", error);
-      res.status(500).json({ message: "Failed to fetch document checklist" });
-    }
-  });
-
-  app.post("/api/document-checklists", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.post("/api/document-checklists", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const parsed = insertDocumentChecklistSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
-      }
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
       const checklist = await storage.createDocumentChecklist(parsed.data);
-      await logAction(req.user?.claims?.sub, "create", "document_checklist", checklist.id, { name: checklist.name, postId: checklist.postId });
+
+      await logAction(req.user.id, "create", "document_checklist", checklist.id);
+
       res.status(201).json(checklist);
-    } catch (error) {
-      console.error("Error creating document checklist:", error);
+    } catch {
       res.status(500).json({ message: "Failed to create document checklist" });
     }
   });
 
-  app.patch("/api/document-checklists/:id", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const before = await storage.getDocumentChecklist(id);
-      if (!before) {
-        return res.status(404).json({ message: "Document checklist not found" });
-      }
-      const checklist = await storage.updateDocumentChecklist(id, req.body);
-      if (!checklist) {
-        return res.status(404).json({ message: "Document checklist not found" });
-      }
-      await logAction(req.user?.claims?.sub, "update", "document_checklist", id, req.body, before, checklist);
-      res.json(checklist);
-    } catch (error) {
-      console.error("Error updating document checklist:", error);
-      res.status(500).json({ message: "Failed to update document checklist" });
-    }
-  });
-
-  app.delete("/api/document-checklists/:id", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const before = await storage.getDocumentChecklist(id);
-      if (!before) {
-        return res.status(404).json({ message: "Document checklist not found" });
-      }
-      const deleted = await storage.deleteDocumentChecklist(id);
-      if (!deleted) {
-        return res.status(404).json({ message: "Document checklist not found" });
-      }
-      await logAction(req.user?.claims?.sub, "delete", "document_checklist", id, null, before, null);
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting document checklist:", error);
-      res.status(500).json({ message: "Failed to delete document checklist" });
-    }
-  });
-
-  app.get("/api/service-posts/:id/checklist-compliance", isAuthenticated, async (req, res) => {
-    try {
-      const postId = parseInt(req.params.id);
-      const compliance = await storage.getChecklistComplianceByPost(postId);
-      res.json(compliance);
-    } catch (error) {
-      console.error("Error fetching checklist compliance:", error);
-      res.status(500).json({ message: "Failed to fetch checklist compliance" });
-    }
-  });
-
-  // Document Version Tracking Routes
-  app.get("/api/documents/:id/versions", isAuthenticated, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const versions = await storage.getDocumentVersions(id);
-      res.json(versions);
-    } catch (error) {
-      console.error("Error fetching document versions:", error);
-      res.status(500).json({ message: "Failed to fetch document versions" });
-    }
-  });
-
-  app.post(
-    "/api/documents/:id/new-version",
-    isAuthenticated,
-    isAdmin,
-    upload.single("file"),
+  app.delete(
+    "/api/document-checklists/:id",
+    authenticateJWT,
+    requireRole(["admin"]),
     async (req: any, res) => {
       try {
-        const originalDocId = parseInt(req.params.id);
-        const originalDoc = await storage.getDocument(originalDocId);
-        if (!originalDoc) {
-          if (req.file) fs.unlinkSync(req.file.path);
-          return res.status(404).json({ message: "Original document not found" });
-        }
+        const id = parseInt(req.params.id);
 
-        if (!req.file) {
-          return res.status(400).json({ message: "No file uploaded" });
-        }
+        const before = await storage.getDocumentChecklist(id);
+        if (!before) return res.status(404).json({ message: "Not found" });
 
-        const newDocument = await storage.createDocumentVersion(originalDocId, {
-          filename: req.file.filename,
-          originalName: req.file.originalname,
-          mimeType: req.file.mimetype,
-          size: req.file.size,
-          path: req.file.path,
-          documentType: originalDoc.documentType,
-          employeeId: originalDoc.employeeId,
-          postId: originalDoc.postId,
-          monthYear: originalDoc.monthYear,
-          expirationDate: req.body.expirationDate || originalDoc.expirationDate,
-          observations: req.body.observations || originalDoc.observations,
-          uploadedBy: req.user?.claims?.sub || null,
-        });
+        await storage.deleteDocumentChecklist(id);
 
-        await logAction(req.user?.claims?.sub, "create_version", "document", newDocument.id, {
-          previousVersionId: originalDocId,
-          version: newDocument.version,
-        });
+        await logAction(req.user.id, "delete", "document_checklist", id, null, before, null);
 
-        res.status(201).json(newDocument);
-      } catch (error) {
-        console.error("Error creating document version:", error);
-        if (req.file && fs.existsSync(req.file.path)) {
-          fs.unlinkSync(req.file.path);
-        }
-        res.status(500).json({ message: "Failed to create document version" });
+        res.status(204).send();
+      } catch {
+        res.status(500).json({ message: "Failed to delete document checklist" });
       }
     }
   );
 
-  // Férias & Licenças Routes
-  app.get("/api/ferias-licencas", isAuthenticated, async (req: any, res) => {
+/* ============================
+   FÉRIAS / LICENÇAS
+   ============================ */
+
+  app.get("/api/ferias-licencas", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (_req, res) => {
     try {
-      const { employeeId, type, status } = req.query;
-      const feriasLicencas = await storage.getFeriasLicencas({
-        employeeId: employeeId ? parseInt(employeeId as string) : undefined,
-        type: type as string | undefined,
-        status: status as string | undefined,
-      });
-      
-      await logLgpdAccess(req, "view", "personal_data", "ferias_licencas_list", undefined, { count: feriasLicencas.length });
-      res.json(feriasLicencas);
-    } catch (error) {
-      console.error("Error fetching férias/licenças:", error);
-      res.status(500).json({ message: "Failed to fetch férias/licenças" });
+      const items = await storage.getFeriasLicencas();
+      res.json(items);
+    } catch {
+      res.status(500).json({ message: "Failed to fetch ferias/licencas" });
     }
   });
 
-  app.get("/api/ferias-licencas/:id", isAuthenticated, async (req: any, res) => {
+  app.post("/api/ferias-licencas", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
+    try {
+      const parsed = insertFeriasLicencasSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
+      const record = await storage.createFeriasLicenca({
+        ...parsed.data,
+        createdBy: req.user.id,
+      });
+
+      await logAction(req.user.id, "create", "ferias_licencas", record.id);
+
+      res.status(201).json(record);
+    } catch {
+      res.status(500).json({ message: "Failed to create ferias/licenca" });
+    }
+  });
+
+  app.patch("/api/ferias-licencas/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
-      const feriasLicenca = await storage.getFeriasLicenca(id);
-      if (!feriasLicenca) {
-        return res.status(404).json({ message: "Férias/Licença not found" });
-      }
-      
-      await logLgpdAccess(req, "view", "personal_data", "ferias_licenca", id, { employeeId: feriasLicenca.employeeId });
-      res.json(feriasLicenca);
-    } catch (error) {
-      console.error("Error fetching férias/licença:", error);
-      res.status(500).json({ message: "Failed to fetch férias/licença" });
-    }
-  });
 
-  function getLeaveAllocationStatus(type: string): "vacation" | "medical_leave" {
-    switch (type) {
-      case "ferias":
-        return "vacation";
-      case "licenca_medica":
-      case "licenca_maternidade":
-      case "licenca_paternidade":
-      case "licenca_nojo":
-      case "licenca_casamento":
-      case "outros":
-      default:
-        return "medical_leave";
-    }
-  }
-
-  async function syncAllocationStatusForVacation(
-    employeeId: number,
-    startDate: string,
-    endDate: string,
-    type: string,
-    status: string
-  ) {
-    const allocationStatus = getLeaveAllocationStatus(type);
-    const shouldApply = status === "aprovado" || status === "em_andamento";
-    
-    const allocations = await storage.getAllocationsByDateRange(startDate, endDate);
-    const employeeAllocations = allocations.filter(a => a.employeeId === employeeId);
-    
-    for (const allocation of employeeAllocations) {
-      if (shouldApply) {
-        await storage.updateAllocation(allocation.id, { status: allocationStatus });
-      } else {
-        await storage.updateAllocation(allocation.id, { status: "present" });
-      }
-    }
-  }
-
-  function validateDateRange(startDate: string, endDate: string): boolean {
-    return new Date(startDate) <= new Date(endDate);
-  }
-
-  app.post("/api/ferias-licencas", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const parsed = insertFeriasLicencasSchema.safeParse({
-        ...req.body,
-        createdBy: req.user?.claims?.sub || null,
-      });
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
-      }
-      
-      if (!validateDateRange(parsed.data.startDate, parsed.data.endDate)) {
-        return res.status(400).json({ message: "Data de início deve ser anterior ou igual à data de término" });
-      }
-      
-      const feriasLicenca = await storage.createFeriasLicenca(parsed.data);
-      
-      if (feriasLicenca.status === "aprovado" || feriasLicenca.status === "em_andamento") {
-        await syncAllocationStatusForVacation(
-          feriasLicenca.employeeId,
-          feriasLicenca.startDate,
-          feriasLicenca.endDate,
-          feriasLicenca.type,
-          feriasLicenca.status
-        );
-      }
-      
-      await logAction(req.user?.claims?.sub, "create", "ferias_licenca", feriasLicenca.id, { 
-        employeeId: feriasLicenca.employeeId, 
-        type: feriasLicenca.type,
-        startDate: feriasLicenca.startDate,
-        endDate: feriasLicenca.endDate,
-      });
-      res.status(201).json(feriasLicenca);
-    } catch (error) {
-      console.error("Error creating férias/licença:", error);
-      res.status(500).json({ message: "Failed to create férias/licença" });
-    }
-  });
-
-  app.patch("/api/ferias-licencas/:id", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
       const before = await storage.getFeriasLicenca(id);
-      if (!before) {
-        return res.status(404).json({ message: "Férias/Licença not found" });
-      }
-      
-      const updateSchema = insertFeriasLicencasSchema.partial().omit({ createdBy: true });
-      const parsed = updateSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
-      }
-      
-      const startDate = parsed.data.startDate || before.startDate;
-      const endDate = parsed.data.endDate || before.endDate;
-      if (!validateDateRange(startDate, endDate)) {
-        return res.status(400).json({ message: "Data de início deve ser anterior ou igual à data de término" });
-      }
-      
-      const feriasLicenca = await storage.updateFeriasLicenca(id, parsed.data);
-      if (!feriasLicenca) {
-        return res.status(404).json({ message: "Férias/Licença not found" });
-      }
-      
-      const beforeWasActive = before.status === "aprovado" || before.status === "em_andamento";
-      const afterIsActive = feriasLicenca.status === "aprovado" || feriasLicenca.status === "em_andamento";
-      
-      if (beforeWasActive && !afterIsActive) {
-        await syncAllocationStatusForVacation(
-          before.employeeId,
-          before.startDate,
-          before.endDate,
-          before.type,
-          "pendente"
-        );
-      }
-      
-      if (afterIsActive) {
-        await syncAllocationStatusForVacation(
-          feriasLicenca.employeeId,
-          feriasLicenca.startDate,
-          feriasLicenca.endDate,
-          feriasLicenca.type,
-          feriasLicenca.status
-        );
-      }
-      
-      await logAction(req.user?.claims?.sub, "update", "ferias_licenca", id, parsed.data, before, feriasLicenca);
-      res.json(feriasLicenca);
-    } catch (error) {
-      console.error("Error updating férias/licença:", error);
-      res.status(500).json({ message: "Failed to update férias/licença" });
+      if (!before) return res.status(404).json({ message: "Not found" });
+
+      const updated = await storage.updateFeriasLicenca(id, req.body);
+
+      await logAction(req.user.id, "update", "ferias_licencas", id, req.body, before, updated);
+
+      res.json(updated);
+    } catch {
+      res.status(500).json({ message: "Failed to update ferias/licenca" });
     }
   });
 
-  app.delete("/api/ferias-licencas/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.delete("/api/ferias-licencas/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+
       const before = await storage.getFeriasLicenca(id);
-      if (!before) {
-        return res.status(404).json({ message: "Férias/Licença not found" });
-      }
-      
-      if (before.status === "aprovado" || before.status === "em_andamento") {
-        await syncAllocationStatusForVacation(
-          before.employeeId,
-          before.startDate,
-          before.endDate,
-          before.type,
-          "pendente"
-        );
-      }
-      
-      const deleted = await storage.deleteFeriasLicenca(id);
-      if (!deleted) {
-        return res.status(404).json({ message: "Férias/Licença not found" });
-      }
-      await logAction(req.user?.claims?.sub, "delete", "ferias_licenca", id, null, before, null);
+      if (!before) return res.status(404).json({ message: "Not found" });
+
+      await storage.deleteFeriasLicenca(id);
+
+      await logAction(req.user.id, "delete", "ferias_licencas", id, null, before, null);
+
       res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting férias/licença:", error);
-      res.status(500).json({ message: "Failed to delete férias/licença" });
+    } catch {
+      res.status(500).json({ message: "Failed to delete ferias/licenca" });
     }
   });
 
-  app.get("/api/dashboard/vacations-leaves", isAuthenticated, async (_req, res) => {
+/* ============================
+   AUDIT LOGS
+   ============================ */
+
+  app.get("/api/audit-logs", authenticateJWT, requireRole(["admin"]), async (_req, res) => {
     try {
-      const activeFeriasLicencas = await storage.getActiveFeriasLicencas();
-      res.json({
-        total: activeFeriasLicencas.length,
-        items: activeFeriasLicencas,
-      });
-    } catch (error) {
-      console.error("Error fetching active vacations/leaves:", error);
-      res.status(500).json({ message: "Failed to fetch active vacations/leaves" });
+      const logs = await storage.getAuditLogs();
+      res.json(logs);
+    } catch {
+      res.status(500).json({ message: "Failed to fetch audit logs" });
     }
   });
 
-  // ============================================================
-  // Service Activities Routes
-  // ============================================================
+/* ============================
+   LGPD LOGS
+   ============================ */
 
-  app.get("/api/service-activities", isAuthenticated, async (req, res) => {
+  app.get("/api/lgpd-logs", authenticateJWT, requireRole(["admin"]), async (_req, res) => {
     try {
-      const { postId } = req.query;
-      const activities = await storage.getServiceActivities(
-        postId ? parseInt(postId as string) : undefined
-      );
-      res.json(activities);
-    } catch (error) {
-      console.error("Error fetching service activities:", error);
-      res.status(500).json({ message: "Failed to fetch service activities" });
+      const logs = await storage.getLgpdLogs();
+      res.json(logs);
+    } catch {
+      res.status(500).json({ message: "Failed to fetch LGPD logs" });
     }
   });
 
-  app.get("/api/service-activities/:id", isAuthenticated, async (req, res) => {
+/* ============================
+   DASHBOARD SUMMARY
+   ============================ */
+
+  app.get("/api/dashboard/summary", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (_req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const activity = await storage.getServiceActivity(id);
-      if (!activity) {
-        return res.status(404).json({ message: "Service activity not found" });
-      }
-      res.json(activity);
-    } catch (error) {
-      console.error("Error fetching service activity:", error);
-      res.status(500).json({ message: "Failed to fetch service activity" });
+      const summary = await storage.getDashboardSummary();
+      res.json(summary);
+    } catch {
+      res.status(500).json({ message: "Failed to load dashboard summary" });
     }
   });
 
-  app.post("/api/service-activities", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const parsed = insertServiceActivitySchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
-      }
-      const activity = await storage.createServiceActivity(parsed.data);
-      await logAction(req.user?.claims?.sub, "create", "service_activity", activity.id, { 
-        name: activity.name,
-        servicePostId: activity.servicePostId,
-      });
-      res.status(201).json(activity);
-    } catch (error) {
-      console.error("Error creating service activity:", error);
-      res.status(500).json({ message: "Failed to create service activity" });
-    }
+/* ============================
+   ERROR HANDLER (FINAL)
+   ============================ */
+
+  app.use((err: any, _req, res) => {
+    console.error("Unhandled route error:", err);
+
+    const status = err.status || 500;
+    const message = err.message || "Internal Server Error";
+
+    res.status(status).json({ message });
   });
 
-  app.patch("/api/service-activities/:id", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const before = await storage.getServiceActivity(id);
-      if (!before) {
-        return res.status(404).json({ message: "Service activity not found" });
-      }
-      const activity = await storage.updateServiceActivity(id, req.body);
-      if (!activity) {
-        return res.status(404).json({ message: "Service activity not found" });
-      }
-      await logAction(req.user?.claims?.sub, "update", "service_activity", id, req.body, before, activity);
-      res.json(activity);
-    } catch (error) {
-      console.error("Error updating service activity:", error);
-      res.status(500).json({ message: "Failed to update service activity" });
-    }
-  });
-
-  app.delete("/api/service-activities/:id", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const before = await storage.getServiceActivity(id);
-      if (!before) {
-        return res.status(404).json({ message: "Service activity not found" });
-      }
-      const deleted = await storage.deleteServiceActivity(id);
-      if (!deleted) {
-        return res.status(404).json({ message: "Service activity not found" });
-      }
-      await logAction(req.user?.claims?.sub, "delete", "service_activity", id, null, before, null);
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting service activity:", error);
-      res.status(500).json({ message: "Failed to delete service activity" });
-    }
-  });
-
-  // ============================================================
-  // Activity Executions Routes
-  // ============================================================
-
-  app.get("/api/activity-executions", isAuthenticated, async (req, res) => {
-    try {
-      const { servicePostId, serviceActivityId, employeeId, startDate, endDate } = req.query;
-      const executions = await storage.getActivityExecutions({
-        servicePostId: servicePostId ? parseInt(servicePostId as string) : undefined,
-        serviceActivityId: serviceActivityId ? parseInt(serviceActivityId as string) : undefined,
-        employeeId: employeeId ? parseInt(employeeId as string) : undefined,
-        startDate: startDate as string | undefined,
-        endDate: endDate as string | undefined,
-      });
-      res.json(executions);
-    } catch (error) {
-      console.error("Error fetching activity executions:", error);
-      res.status(500).json({ message: "Failed to fetch activity executions" });
-    }
-  });
-
-  app.get("/api/activity-executions/:id", isAuthenticated, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const execution = await storage.getActivityExecution(id);
-      if (!execution) {
-        return res.status(404).json({ message: "Activity execution not found" });
-      }
-      res.json(execution);
-    } catch (error) {
-      console.error("Error fetching activity execution:", error);
-      res.status(500).json({ message: "Failed to fetch activity execution" });
-    }
-  });
-
-  app.post("/api/activity-executions", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const parsed = insertActivityExecutionSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
-      }
-      const execution = await storage.createActivityExecution(parsed.data);
-      await logAction(req.user?.claims?.sub, "create", "activity_execution", execution.id, { 
-        serviceActivityId: execution.serviceActivityId,
-        date: execution.date,
-        quantity: execution.quantity,
-      });
-      res.status(201).json(execution);
-    } catch (error) {
-      console.error("Error creating activity execution:", error);
-      res.status(500).json({ message: "Failed to create activity execution" });
-    }
-  });
-
-  app.post("/api/activity-executions/bulk", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const { executions } = req.body;
-      if (!Array.isArray(executions) || executions.length === 0) {
-        return res.status(400).json({ message: "Executions array is required" });
-      }
-      
-      const validatedExecutions = [];
-      for (const exec of executions) {
-        const parsed = insertActivityExecutionSchema.safeParse(exec);
-        if (!parsed.success) {
-          return res.status(400).json({ 
-            message: "Invalid data in executions array", 
-            errors: parsed.error.errors 
-          });
-        }
-        validatedExecutions.push(parsed.data);
-      }
-      
-      const created = await storage.bulkUpsertActivityExecutions(validatedExecutions);
-      await logAction(req.user?.claims?.sub, "bulk_upsert", "activity_execution", undefined, { 
-        count: created.length,
-      });
-      res.status(201).json({ message: "Executions saved successfully", count: created.length, executions: created });
-    } catch (error) {
-      console.error("Error bulk upserting activity executions:", error);
-      res.status(500).json({ message: "Failed to save activity executions" });
-    }
-  });
-
-  app.patch("/api/activity-executions/:id", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const before = await storage.getActivityExecution(id);
-      if (!before) {
-        return res.status(404).json({ message: "Activity execution not found" });
-      }
-      const execution = await storage.updateActivityExecution(id, req.body);
-      if (!execution) {
-        return res.status(404).json({ message: "Activity execution not found" });
-      }
-      await logAction(req.user?.claims?.sub, "update", "activity_execution", id, req.body, before, execution);
-      res.json(execution);
-    } catch (error) {
-      console.error("Error updating activity execution:", error);
-      res.status(500).json({ message: "Failed to update activity execution" });
-    }
-  });
-
-  app.delete("/api/activity-executions/:id", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const before = await storage.getActivityExecution(id);
-      if (!before) {
-        return res.status(404).json({ message: "Activity execution not found" });
-      }
-      const deleted = await storage.deleteActivityExecution(id);
-      if (!deleted) {
-        return res.status(404).json({ message: "Activity execution not found" });
-      }
-      await logAction(req.user?.claims?.sub, "delete", "activity_execution", id, null, before, null);
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting activity execution:", error);
-      res.status(500).json({ message: "Failed to delete activity execution" });
-    }
-  });
-
-  // ============================================================
-  // Activity Execution Attachments Routes
-  // ============================================================
-
-  app.get("/api/activity-executions/:id/attachments", isAuthenticated, async (req, res) => {
-    try {
-      const executionId = parseInt(req.params.id);
-      const attachments = await storage.getActivityExecutionAttachments(executionId);
-      res.json(attachments);
-    } catch (error) {
-      console.error("Error fetching activity execution attachments:", error);
-      res.status(500).json({ message: "Failed to fetch attachments" });
-    }
-  });
-
-  app.post(
-    "/api/activity-executions/:id/attachments",
-    isAuthenticated,
-    isAdmin,
-    upload.single("file"),
-    async (req: any, res) => {
-      try {
-        const executionId = parseInt(req.params.id);
-        
-        const execution = await storage.getActivityExecution(executionId);
-        if (!execution) {
-          if (req.file) {
-            fs.unlinkSync(req.file.path);
-          }
-          return res.status(404).json({ message: "Activity execution not found" });
-        }
-        
-        if (!req.file) {
-          return res.status(400).json({ message: "No file uploaded" });
-        }
-        
-        const attachment = await storage.createActivityExecutionAttachment({
-          activityExecutionId: executionId,
-          fileName: req.file.originalname,
-          filePath: req.file.path,
-          mimeType: req.file.mimetype,
-        });
-        
-        await logAction(req.user?.claims?.sub, "create", "activity_execution_attachment", attachment.id, {
-          activityExecutionId: executionId,
-          fileName: attachment.fileName,
-        });
-        
-        res.status(201).json(attachment);
-      } catch (error) {
-        console.error("Error uploading attachment:", error);
-        if (req.file) {
-          try {
-            fs.unlinkSync(req.file.path);
-          } catch (e) {
-            console.error("Failed to delete file after error:", e);
-          }
-        }
-        res.status(500).json({ message: "Failed to upload attachment" });
-      }
-    }
-  );
-
-  app.get("/api/activity-execution-attachments/:id/download", isAuthenticated, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const attachment = await storage.getActivityExecutionAttachment(id);
-      if (!attachment) {
-        return res.status(404).json({ message: "Attachment not found" });
-      }
-      
-      if (!fs.existsSync(attachment.filePath)) {
-        return res.status(404).json({ message: "File not found on server" });
-      }
-      
-      res.download(attachment.filePath, attachment.fileName);
-    } catch (error) {
-      console.error("Error downloading attachment:", error);
-      res.status(500).json({ message: "Failed to download attachment" });
-    }
-  });
-
-  app.delete("/api/activity-execution-attachments/:id", isAuthenticated, isAdmin, async (req: any, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const attachment = await storage.getActivityExecutionAttachment(id);
-      if (!attachment) {
-        return res.status(404).json({ message: "Attachment not found" });
-      }
-      
-      if (fs.existsSync(attachment.filePath)) {
-        fs.unlinkSync(attachment.filePath);
-      }
-      
-      const deleted = await storage.deleteActivityExecutionAttachment(id);
-      if (!deleted) {
-        return res.status(404).json({ message: "Attachment not found" });
-      }
-      
-      await logAction(req.user?.claims?.sub, "delete", "activity_execution_attachment", id, null, attachment, null);
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting attachment:", error);
-      res.status(500).json({ message: "Failed to delete attachment" });
-    }
-  });
-
-  // ============================================================
-  // Activity Execution Reports
-  // ============================================================
-
-  app.get("/api/reports/activity-execution", isAuthenticated, async (req, res) => {
-    try {
-      const { startDate, endDate, servicePostId } = req.query;
-      
-      if (!startDate || !endDate) {
-        return res.status(400).json({ message: "startDate and endDate are required" });
-      }
-      
-      const report = await storage.getActivityExecutionReport({
-        startDate: startDate as string,
-        endDate: endDate as string,
-        servicePostId: servicePostId ? parseInt(servicePostId as string) : undefined,
-      });
-      
-      res.json(report);
-    } catch (error) {
-      console.error("Error fetching activity execution report:", error);
-      res.status(500).json({ message: "Failed to fetch report" });
-    }
-  });
+  console.log("Routes registered with Supabase Auth + JWT.");
 
   return httpServer;
 }

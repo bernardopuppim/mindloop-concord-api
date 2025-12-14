@@ -20,7 +20,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatCPF } from "@/lib/authUtils";
 import { translations } from "@/lib/translations";
 import { cn } from "@/lib/utils";
-import type { Employee, ServicePost } from "@shared/schema";
+import type { Employee, ServicePost } from "@shared/types";
 
 const formSchema = z.object({
   name: z.string().min(2, translations.validation.minLength.replace("{min}", "2")),

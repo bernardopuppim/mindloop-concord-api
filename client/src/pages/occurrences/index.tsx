@@ -15,7 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDate } from "@/lib/authUtils";
 import { translations } from "@/lib/translations";
-import type { Occurrence, Employee, ServicePost } from "@shared/schema";
+import type { Occurrence, Employee, ServicePost } from "@shared/types";
 
 export default function OccurrencesPage() {
   const { isAdmin } = useAuth();

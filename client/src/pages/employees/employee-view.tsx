@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDate } from "@/lib/authUtils";
 import { translations } from "@/lib/translations";
-import type { Employee, Document, Allocation } from "@shared/schema";
+import type { Employee, Document, Allocation } from "@shared/types";
 
 interface EmployeeViewProps {
   employeeId: number;

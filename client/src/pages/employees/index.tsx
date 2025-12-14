@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { translations } from "@/lib/translations";
-import type { Employee } from "@shared/schema";
+import type { Employee } from "@shared/types";
 
 export default function EmployeesPage() {
   const { isAdmin } = useAuth();

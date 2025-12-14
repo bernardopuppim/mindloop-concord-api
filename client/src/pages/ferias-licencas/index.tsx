@@ -58,7 +58,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { translations } from "@/lib/translations";
 import { useAuth } from "@/hooks/useAuth";
-import type { Employee, FeriasLicencasWithRelations } from "@shared/schema";
+import type { Employee, FeriasLicencasWithRelations } from "@shared/types";
 
 const feriasLicencasFormSchema = z.object({
   employeeId: z.string().min(1, translations.validation.required),

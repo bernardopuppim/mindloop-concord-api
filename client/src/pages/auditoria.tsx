@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { Shield } from "lucide-react";
 import { formatDateTime } from "@/lib/authUtils";
-import type { User, AuditLog } from "@shared/schema";
+import type { User, AuditLog } from "@shared/types";
 
 type AuditLogWithUser = AuditLog & { user?: User | null };
 

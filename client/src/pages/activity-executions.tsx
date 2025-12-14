@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { ServicePost, ServiceActivity, ActivityExecution, ActivityExecutionAttachment, Employee } from "@shared/schema";
+import type { ServicePost, ServiceActivity, ActivityExecution, ActivityExecutionAttachment, Employee } from "@shared/types";
 
 const frequencyLabels: Record<string, string> = {
   daily: "Diária",

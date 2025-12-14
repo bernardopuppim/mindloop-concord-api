@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Briefcase, CalendarDays, AlertCircle, FileText, TrendingUp, Clock, CheckCircle, BarChart3, PieChart, ClipboardCheck, Activity, Target } from "lucide-react";
-import type { Employee, ServicePost, Allocation, Occurrence, Document } from "@shared/schema";
+import type { Employee, ServicePost, Allocation, Occurrence, Document } from "@shared/types";
 import { translations } from "@/lib/translations";
 import {
   AreaChart,

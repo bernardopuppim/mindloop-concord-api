@@ -6,52 +6,54 @@ import {
   occurrences,
   documents,
   auditLogs,
-  notificationSettings,
   lgpdLogs,
   documentChecklists,
   feriasLicencas,
   serviceActivities,
   activityExecutions,
   activityExecutionAttachments,
-  type User,
-  type UpsertUser,
-  type Employee,
-  type InsertEmployee,
-  type ServicePost,
-  type InsertServicePost,
-  type Allocation,
-  type InsertAllocation,
-  type AllocationWithRelations,
-  type Occurrence,
-  type InsertOccurrence,
-  type OccurrenceWithRelations,
-  type Document,
-  type InsertDocument,
-  type DocumentWithRelations,
-  type AuditLog,
-  type InsertAuditLog,
-  type AuditLogWithRelations,
-  type NotificationSettings,
-  type InsertNotificationSettings,
-  type NotificationSettingsWithRelations,
-  type LgpdLog,
-  type InsertLgpdLog,
-  type LgpdLogWithRelations,
-  type DocumentChecklist,
-  type InsertDocumentChecklist,
-  type DocumentChecklistWithRelations,
-  type FeriasLicencas,
-  type InsertFeriasLicencas,
-  type FeriasLicencasWithRelations,
-  type ServiceActivity,
-  type InsertServiceActivity,
-  type ServiceActivityWithRelations,
-  type ActivityExecution,
-  type InsertActivityExecution,
-  type ActivityExecutionWithRelations,
-  type ActivityExecutionAttachment,
-  type InsertActivityExecutionAttachment,
+  alerts,
 } from "@shared/schema";
+import type {
+  User,
+  UpsertUser,
+  Employee,
+  InsertEmployee,
+  ServicePost,
+  InsertServicePost,
+  Allocation,
+  InsertAllocation,
+  AllocationWithRelations,
+  Occurrence,
+  InsertOccurrence,
+  OccurrenceWithRelations,
+  Document,
+  InsertDocument,
+  DocumentWithRelations,
+  AuditLog,
+  InsertAuditLog,
+  AuditLogWithRelations,
+  NotificationSettings,
+  InsertNotificationSettings,
+  NotificationSettingsWithRelations,
+  LgpdLog,
+  InsertLgpdLog,
+  LgpdLogWithRelations,
+  DocumentChecklist,
+  InsertDocumentChecklist,
+  DocumentChecklistWithRelations,
+  FeriasLicencas,
+  InsertFeriasLicencas,
+  FeriasLicencasWithRelations,
+  ServiceActivity,
+  InsertServiceActivity,
+  ServiceActivityWithRelations,
+  ActivityExecution,
+  InsertActivityExecution,
+  ActivityExecutionWithRelations,
+  ActivityExecutionAttachment,
+  InsertActivityExecutionAttachment,
+} from "@shared/types";
 import { db } from "./db";
 import { eq, desc, and, like, gte, lte, or, sql } from "drizzle-orm";
 
@@ -112,6 +114,14 @@ export interface IStorage {
     recentOccurrences: number;
   }>;
 
+  getDashboardSummary(): Promise<{
+    totalEmployees: number;
+    activeEmployees: number;
+    totalServicePosts: number;
+    totalDocuments: number;
+    recentOccurrences: number;
+  }>;
+
   getAllocationTrends(days?: number): Promise<Array<{
     date: string;
     present: number;
@@ -141,15 +151,9 @@ export interface IStorage {
     postsWithoutExecution: number;
   }>;
 
-  getNotificationSettings(): Promise<NotificationSettingsWithRelations[]>;
-  getNotificationSettingsByUser(userId: string): Promise<NotificationSettings | undefined>;
-  createNotificationSettings(settings: InsertNotificationSettings): Promise<NotificationSettings>;
-  updateNotificationSettings(id: number, settings: Partial<InsertNotificationSettings>): Promise<NotificationSettings | undefined>;
-  deleteNotificationSettings(id: number): Promise<boolean>;
-  getActiveNotificationRecipients(notificationType: 'occurrences' | 'allocations' | 'documents' | 'daily'): Promise<string[]>;
-
   createLgpdLog(log: InsertLgpdLog): Promise<LgpdLog>;
   getLgpdLogsFiltered(filters?: { userId?: string; accessType?: string; dataCategory?: string; entityType?: string; startDate?: string; endDate?: string; limit?: number }): Promise<LgpdLogWithRelations[]>;
+  getLgpdLogs(): Promise<LgpdLogWithRelations[]>;
 
   getPrevistoRealizadoReport(filters: { startDate: string; endDate: string; postId?: number }): Promise<{
     summary: { totalPrevisto: number; totalRealizado: number; compliancePercentage: number };
@@ -672,6 +676,16 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  async getDashboardSummary(): Promise<{
+    totalEmployees: number;
+    activeEmployees: number;
+    totalServicePosts: number;
+    totalDocuments: number;
+    recentOccurrences: number;
+  }> {
+    return this.getDashboardStats();
+  }
+
   async getAllocationTrends(days: number = 30): Promise<Array<{
     date: string;
     present: number;
@@ -873,68 +887,6 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getNotificationSettings(): Promise<NotificationSettingsWithRelations[]> {
-    const result = await db.query.notificationSettings.findMany({
-      with: {
-        user: true,
-      },
-      orderBy: [desc(notificationSettings.createdAt)],
-    });
-    return result;
-  }
-
-  async getNotificationSettingsByUser(userId: string): Promise<NotificationSettings | undefined> {
-    const [settings] = await db
-      .select()
-      .from(notificationSettings)
-      .where(eq(notificationSettings.userId, userId));
-    return settings;
-  }
-
-  async createNotificationSettings(settings: InsertNotificationSettings): Promise<NotificationSettings> {
-    const [created] = await db.insert(notificationSettings).values(settings).returning();
-    return created;
-  }
-
-  async updateNotificationSettings(id: number, settings: Partial<InsertNotificationSettings>): Promise<NotificationSettings | undefined> {
-    const [updated] = await db
-      .update(notificationSettings)
-      .set({ ...settings, updatedAt: new Date() })
-      .where(eq(notificationSettings.id, id))
-      .returning();
-    return updated;
-  }
-
-  async deleteNotificationSettings(id: number): Promise<boolean> {
-    const result = await db.delete(notificationSettings).where(eq(notificationSettings.id, id));
-    return (result.rowCount ?? 0) > 0;
-  }
-
-  async getActiveNotificationRecipients(notificationType: 'occurrences' | 'allocations' | 'documents' | 'daily'): Promise<string[]> {
-    let condition;
-    switch (notificationType) {
-      case 'occurrences':
-        condition = eq(notificationSettings.notifyNewOccurrences, true);
-        break;
-      case 'allocations':
-        condition = eq(notificationSettings.notifyMissingAllocations, true);
-        break;
-      case 'documents':
-        condition = eq(notificationSettings.notifyDocumentExpiration, true);
-        break;
-      case 'daily':
-        condition = eq(notificationSettings.notifyDailySummary, true);
-        break;
-    }
-
-    const settings = await db
-      .select({ email: notificationSettings.email })
-      .from(notificationSettings)
-      .where(and(eq(notificationSettings.isActive, true), condition));
-
-    return settings.map(s => s.email);
-  }
-
   async createLgpdLog(log: InsertLgpdLog): Promise<LgpdLog> {
     const [created] = await db.insert(lgpdLogs).values(log).returning();
     return created;
@@ -962,6 +914,10 @@ export class DatabaseStorage implements IStorage {
       limit: filters?.limit || 500,
     });
     return result;
+  }
+
+  async getLgpdLogs(): Promise<LgpdLogWithRelations[]> {
+    return this.getLgpdLogsFiltered({});
   }
 
   async getPrevistoRealizadoReport(filters: { startDate: string; endDate: string; postId?: number }): Promise<{

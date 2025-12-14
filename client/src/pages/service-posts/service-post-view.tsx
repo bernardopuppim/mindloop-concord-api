@@ -52,7 +52,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { ServicePost, Allocation, Document, Employee, ServiceActivity, InsertServiceActivity } from "@shared/schema";
+import type { ServicePost, Allocation, Document, Employee, ServiceActivity, InsertServiceActivity } from "@shared/types";
 
 const activityFormSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),

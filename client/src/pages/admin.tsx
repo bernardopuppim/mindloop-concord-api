@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDateTime } from "@/lib/authUtils";
 import { translations } from "@/lib/translations";
-import type { User, AuditLog } from "@shared/schema";
+import type { User, AuditLog } from "@shared/types";
 
 export default function AdminPage() {
   const { isAdmin, user: currentUser } = useAuth();
