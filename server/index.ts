@@ -1,31 +1,14 @@
-import "dotenv/config";
-import express from "express";
-import { registerRoutes } from "./routes";
-import { serveStatic } from "./static";
 import { createServer } from "http";
+import { createApp } from "./app";
+import { serveStatic } from "./static";
 
-const app = express();
-const httpServer = createServer(app);
-
-declare module "http" {
-  interface IncomingMessage {
-    rawBody: unknown;
-  }
-}
-
-app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      (req as any).rawBody = buf;
-    }
-  })
-);
-
-app.use(express.urlencoded({ extended: false }));
+const PORT = parseInt(process.env.PORT || "3001", 10);
 
 (async () => {
-  await registerRoutes(httpServer, app);
+  const app = await createApp();
+  const httpServer = createServer(app);
 
+  // Setup static files or Vite in development
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
@@ -33,9 +16,8 @@ app.use(express.urlencoded({ extended: false }));
     await setupVite(httpServer, app);
   }
 
-  const port = parseInt(process.env.PORT || "3001", 10);
   httpServer.listen(
-    { port, host: "0.0.0.0" },
-    () => console.log(`🚀 API running on port ${port}`)
+    { port: PORT, host: "0.0.0.0" },
+    () => console.log(`🚀 API running on port ${PORT}`)
   );
 })();

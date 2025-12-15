@@ -1,5 +1,4 @@
 import type { Express } from "express";
-import { type Server } from "http";
 
 import { storage } from "./storage";
 
@@ -86,9 +85,8 @@ async function logLgpdAccess(req: any, accessType: "view" | "export" | "search",
    ============================================================ */
 
 export async function registerRoutes(
-  httpServer: Server,
   app: Express
-): Promise<Server> {
+): Promise<void> {
 
 /* ============================
    AUTHENTICATED USER
@@ -867,6 +865,4 @@ export async function registerRoutes(
   });
 
   console.log("Routes registered with Supabase Auth + JWT.");
-
-  return httpServer;
 }

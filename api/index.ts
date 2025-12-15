@@ -1,3 +1,15 @@
-import getApp from "../server/app";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { createApp } from "../server/app";
 
-export default getApp;
+let app: any;
+
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
+  if (!app) {
+    app = await createApp();
+  }
+
+  return app(req, res);
+}
