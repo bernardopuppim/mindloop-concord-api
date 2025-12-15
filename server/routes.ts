@@ -92,7 +92,7 @@ export async function registerRoutes(
    AUTHENTICATED USER
    ============================ */
 
-  app.get("/api/auth/user", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
+  app.get("/auth/user", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.id);
       res.json(user);
@@ -106,7 +106,7 @@ export async function registerRoutes(
    DASHBOARD BASIC
    ============================ */
 
-  app.get("/api/dashboard/stats", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (_req, res) => {
+  app.get("/dashboard/stats", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (_req, res) => {
     try {
       const stats = await storage.getDashboardStats();
       res.json(stats);
@@ -119,7 +119,7 @@ export async function registerRoutes(
    EMPLOYEES
    ============================ */
 
-  app.get("/api/employees", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
+  app.get("/employees", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const { search } = req.query;
 
@@ -137,7 +137,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/employees/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
+  app.get("/employees/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const employee = await storage.getEmployee(id);
@@ -154,7 +154,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/employees", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
+  app.post("/employees", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const parsed = insertEmployeeSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json(parsed.error);
@@ -174,7 +174,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/employees/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
+  app.patch("/employees/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
 
@@ -191,7 +191,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/employees/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
+  app.delete("/employees/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
 
@@ -212,7 +212,7 @@ export async function registerRoutes(
    SERVICE POSTS
    ============================ */
 
-  app.get("/api/service-posts", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req, res) => {
+  app.get("/service-posts", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req, res) => {
     try {
       const { search } = req.query;
 
@@ -227,7 +227,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/service-posts/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req, res) => {
+  app.get("/service-posts/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const post = await storage.getServicePost(id);
@@ -240,7 +240,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/service-posts", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
+  app.post("/service-posts", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const parsed = insertServicePostSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json(parsed.error);
@@ -260,7 +260,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/service-posts/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
+  app.patch("/service-posts/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
 
@@ -277,7 +277,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/service-posts/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
+  app.delete("/service-posts/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
 
@@ -298,7 +298,7 @@ export async function registerRoutes(
    ALLOCATIONS
    ============================ */
 
-  app.get("/api/allocations", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
+  app.get("/allocations", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const { date, employeeId, postId, startDate, endDate } = req.query;
 
@@ -328,7 +328,7 @@ export async function registerRoutes(
     }
   });
 
-    app.get("/api/allocations/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
+    app.get("/allocations/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const allocation = await storage.getAllocation(id);
@@ -346,7 +346,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/allocations", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
+  app.post("/allocations", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const parsed = insertAllocationSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json(parsed.error);
@@ -361,7 +361,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/allocations/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
+  app.patch("/allocations/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
 
@@ -378,7 +378,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/allocations/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
+  app.delete("/allocations/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
 
@@ -400,7 +400,7 @@ export async function registerRoutes(
    ============================ */
 
   app.post(
-    "/api/allocations/import-csv",
+    "/allocations/import-csv",
     authenticateJWT,
     requireRole(["admin", "operador"]),
     upload.single("file"),
@@ -467,7 +467,7 @@ export async function registerRoutes(
    OCCURRENCES
    ============================ */
 
-  app.get("/api/occurrences", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
+  app.get("/occurrences", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const { startDate, endDate, category, employeeId } = req.query;
 
@@ -489,7 +489,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/occurrences/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
+  app.get("/occurrences/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const occurrence = await storage.getOccurrence(id);
@@ -508,7 +508,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/occurrences", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
+  app.post("/occurrences", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const parsed = insertOccurrenceSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json(parsed.error);
@@ -523,7 +523,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/occurrences/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
+  app.patch("/occurrences/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
 
@@ -540,7 +540,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/occurrences/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
+  app.delete("/occurrences/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
 
@@ -561,7 +561,7 @@ export async function registerRoutes(
    DOCUMENTS
    ============================ */
 
-  app.get("/api/documents", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
+  app.get("/documents", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const { employeeId, postId, category, type } = req.query;
 
@@ -583,7 +583,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/documents/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
+  app.get("/documents/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const document = await storage.getDocument(id);
@@ -601,7 +601,7 @@ export async function registerRoutes(
   });
 
   app.post(
-    "/api/documents",
+    "/documents",
     authenticateJWT,
     requireRole(["admin", "operador"]),
     upload.single("file"),
@@ -638,7 +638,7 @@ export async function registerRoutes(
     }
   );
 
-  app.get("/api/documents/:id/download", authenticateJWT, requireRole(["admin", "fiscal"]), async (req: any, res) => {
+  app.get("/documents/:id/download", authenticateJWT, requireRole(["admin", "fiscal"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const document = await storage.getDocument(id);
@@ -659,7 +659,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/documents/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
+  app.patch("/documents/:id", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
 
@@ -676,7 +676,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/documents/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
+  app.delete("/documents/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
 
@@ -701,7 +701,7 @@ export async function registerRoutes(
    DOCUMENT CHECKLISTS
    ============================ */
 
-  app.get("/api/document-checklists", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (_req, res) => {
+  app.get("/document-checklists", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (_req, res) => {
     try {
       const items = await storage.getDocumentChecklists();
       res.json(items);
@@ -710,7 +710,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/document-checklists", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
+  app.post("/document-checklists", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const parsed = insertDocumentChecklistSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json(parsed.error);
@@ -726,7 +726,7 @@ export async function registerRoutes(
   });
 
   app.delete(
-    "/api/document-checklists/:id",
+    "/document-checklists/:id",
     authenticateJWT,
     requireRole(["admin"]),
     async (req: any, res) => {
@@ -751,7 +751,7 @@ export async function registerRoutes(
    FÉRIAS / LICENÇAS
    ============================ */
 
-  app.get("/api/ferias-licencas", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (_req, res) => {
+  app.get("/ferias-licencas", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (_req, res) => {
     try {
       const items = await storage.getFeriasLicencas();
       res.json(items);
@@ -760,7 +760,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/ferias-licencas", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
+  app.post("/ferias-licencas", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const parsed = insertFeriasLicencasSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json(parsed.error);
@@ -778,7 +778,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/ferias-licencas/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
+  app.patch("/ferias-licencas/:id", authenticateJWT, requireRole(["admin", "operador"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
 
@@ -795,7 +795,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/ferias-licencas/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
+  app.delete("/ferias-licencas/:id", authenticateJWT, requireRole(["admin"]), async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
 
@@ -816,7 +816,7 @@ export async function registerRoutes(
    AUDIT LOGS
    ============================ */
 
-  app.get("/api/audit-logs", authenticateJWT, requireRole(["admin"]), async (_req, res) => {
+  app.get("/audit-logs", authenticateJWT, requireRole(["admin"]), async (_req, res) => {
     try {
       const logs = await storage.getAuditLogs();
       res.json(logs);
@@ -829,7 +829,7 @@ export async function registerRoutes(
    LGPD LOGS
    ============================ */
 
-  app.get("/api/lgpd-logs", authenticateJWT, requireRole(["admin"]), async (_req, res) => {
+  app.get("/lgpd-logs", authenticateJWT, requireRole(["admin"]), async (_req, res) => {
     try {
       const logs = await storage.getLgpdLogs();
       res.json(logs);
@@ -842,7 +842,7 @@ export async function registerRoutes(
    DASHBOARD SUMMARY
    ============================ */
 
-  app.get("/api/dashboard/summary", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (_req, res) => {
+  app.get("/dashboard/summary", authenticateJWT, requireRole(["admin", "fiscal", "operador", "visualizador"]), async (_req, res) => {
     try {
       const summary = await storage.getDashboardSummary();
       res.json(summary);
