@@ -1,19 +1,10 @@
 {
   "version": 2,
-
   "buildCommand": "npm run build",
-
+  "outputDirectory": "dist/public",
   "functions": {
     "api/**/*.ts": {
       "runtime": "nodejs20.x"
     }
-  },
-
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" }
-  ],
-
-  "outputDirectory": "dist/public",
-
-  "ignoreCommand": "echo 'ignore server bundle'"
+  }
 }
