@@ -54,7 +54,7 @@ import type {
   ActivityExecutionAttachment,
   InsertActivityExecutionAttachment,
 } from "@shared/types";
-import { db } from "./db";
+import { db } from "./db.js";
 import { eq, desc, and, like, gte, lte, or, sql } from "drizzle-orm";
 
 // Type for audit log with diff fields

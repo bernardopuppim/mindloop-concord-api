@@ -1,9 +1,9 @@
 import type { Express } from "express";
 
-import { storage } from "./storage";
+import { storage } from "./storage.js";
 
-import { authenticateJWT } from "./auth/jwtAuth";
-import { requireRole } from "./auth/rbac";
+import { authenticateJWT } from "./auth/jwtAuth.js";
+import { requireRole } from "./auth/rbac.js";
 
 import {
   insertEmployeeSchema,

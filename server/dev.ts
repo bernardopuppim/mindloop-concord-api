@@ -1,6 +1,6 @@
 import { createServer } from "http";
-import { createApp } from "./app";
-import { serveStatic } from "./static";
+import { createApp } from "./app.js";
+import { serveStatic } from "./static.js";
 
 const PORT = parseInt(process.env.PORT || "3001", 10);
 
