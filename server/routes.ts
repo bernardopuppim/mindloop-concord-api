@@ -857,7 +857,7 @@ export async function registerRoutes(
    ERROR HANDLER (FINAL)
    ============================ */
 
-  app.use((err: any, _req, res) => {
+  app.use((err: any, _req: any, res: any, _next: any) => {
     console.error("Unhandled route error:", err);
 
     const status = err.status || 500;

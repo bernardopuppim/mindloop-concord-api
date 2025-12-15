@@ -57,6 +57,13 @@ import type {
 import { db } from "./db";
 import { eq, desc, and, like, gte, lte, or, sql } from "drizzle-orm";
 
+// Type for audit log with diff fields
+type AuditLogWithDiff = InsertAuditLog & {
+  userId?: string | null;
+  diffBefore?: any;
+  diffAfter?: any;
+};
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
@@ -93,7 +100,7 @@ export interface IStorage {
   updateOccurrence(id: number, occurrence: Partial<InsertOccurrence>): Promise<Occurrence | undefined>;
   deleteOccurrence(id: number): Promise<boolean>;
 
-  getDocuments(filters?: { documentType?: string; employeeId?: number; postId?: number; monthYear?: string }): Promise<DocumentWithRelations[]>;
+  getDocuments(filters?: { documentType?: string; employeeId?: number; postId?: number; monthYear?: string; category?: string; type?: string }): Promise<DocumentWithRelations[]>;
   getDocument(id: number): Promise<DocumentWithRelations | undefined>;
   createDocument(document: InsertDocument): Promise<Document>;
   updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document | undefined>;
@@ -104,7 +111,7 @@ export interface IStorage {
   getAuditLogs(limit?: number): Promise<AuditLogWithRelations[]>;
   getAuditLogsFiltered(filters?: { userId?: string; entityType?: string; action?: string; startDate?: string; endDate?: string; limit?: number }): Promise<AuditLogWithRelations[]>;
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
-  createAuditLogWithDiff(log: InsertAuditLog & { diffBefore?: any; diffAfter?: any }): Promise<AuditLog>;
+  createAuditLogWithDiff(log: AuditLogWithDiff): Promise<AuditLog>;
 
   getDashboardStats(): Promise<{
     totalEmployees: number;
@@ -500,9 +507,12 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount ?? 0) > 0;
   }
 
-  async getDocuments(filters?: { documentType?: string; employeeId?: number; postId?: number; monthYear?: string }): Promise<DocumentWithRelations[]> {
+  async getDocuments(filters?: { documentType?: string; employeeId?: number; postId?: number; monthYear?: string; category?: string; type?: string }): Promise<DocumentWithRelations[]> {
     const conditions = [];
-    if (filters?.documentType) conditions.push(eq(documents.documentType, filters.documentType as any));
+    // 'type' is an alias for 'documentType'
+    const docType = filters?.type || filters?.documentType;
+    if (docType) conditions.push(eq(documents.documentType, docType as any));
+    if (filters?.category) conditions.push(eq(documents.category, filters.category as any));
     if (filters?.employeeId) conditions.push(eq(documents.employeeId, filters.employeeId));
     if (filters?.postId) conditions.push(eq(documents.postId, filters.postId));
     if (filters?.monthYear) conditions.push(eq(documents.monthYear, filters.monthYear));
@@ -629,7 +639,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async createAuditLogWithDiff(log: InsertAuditLog & { diffBefore?: any; diffAfter?: any }): Promise<AuditLog> {
+  async createAuditLogWithDiff(log: AuditLogWithDiff): Promise<AuditLog> {
     const [created] = await db.insert(auditLogs).values({
       ...log,
       diffBefore: log.diffBefore || null,
