@@ -19,105 +19,48 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 
 // USERS
-export const insertUserSchema = createInsertSchema(users).omit({
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertUserSchema = createInsertSchema(users);
 
 // EMPLOYEES
-export const insertEmployeeSchema = createInsertSchema(employees)
-  .omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-  })
-  .extend({
-    cpf: z
-      .string()
-      .regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, "CPF deve estar no formato XXX.XXX.XXX-XX"),
-  });
+export const insertEmployeeSchema = createInsertSchema(employees, {
+  cpf: z
+    .string()
+    .regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, "CPF deve estar no formato XXX.XXX.XXX-XX"),
+});
 
 // SERVICE POSTS
-export const insertServicePostSchema = createInsertSchema(servicePosts).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertServicePostSchema = createInsertSchema(servicePosts);
 
 // ALLOCATIONS
-export const insertAllocationSchema = createInsertSchema(allocations).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertAllocationSchema = createInsertSchema(allocations);
 
 // OCCURRENCES
-export const insertOccurrenceSchema = createInsertSchema(occurrences).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  treated: true,
-  treatedBy: true,
-  treatedAt: true,
-});
+export const insertOccurrenceSchema = createInsertSchema(occurrences);
 
 // DOCUMENTS
-export const insertDocumentSchema = createInsertSchema(documents).omit({
-  id: true,
-  createdAt: true,
-});
+export const insertDocumentSchema = createInsertSchema(documents);
 
 // AUDIT LOGS
-export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
-  id: true,
-  timestamp: true,
-});
+export const insertAuditLogSchema = createInsertSchema(auditLogs);
 
 // ALERTS
-export const insertAlertSchema = createInsertSchema(alerts).omit({
-  id: true,
-  createdAt: true,
-  resolvedBy: true,
-  resolvedAt: true,
-});
+export const insertAlertSchema = createInsertSchema(alerts);
 
 // LGPD LOGS
-export const insertLgpdLogSchema = createInsertSchema(lgpdLogs).omit({
-  id: true,
-  timestamp: true,
-});
+export const insertLgpdLogSchema = createInsertSchema(lgpdLogs);
 
 // DOCUMENT CHECKLISTS
-export const insertDocumentChecklistSchema = createInsertSchema(documentChecklists).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertDocumentChecklistSchema = createInsertSchema(documentChecklists);
 
 // FÉRIAS E LICENÇAS
-export const insertFeriasLicencasSchema = createInsertSchema(feriasLicencas).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertFeriasLicencasSchema = createInsertSchema(feriasLicencas);
 
 // SERVICE ACTIVITIES
-export const insertServiceActivitySchema = createInsertSchema(serviceActivities).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertServiceActivitySchema = createInsertSchema(serviceActivities);
 
 // ACTIVITY EXECUTIONS
-export const insertActivityExecutionSchema = createInsertSchema(activityExecutions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertActivityExecutionSchema = createInsertSchema(activityExecutions);
 
 // ACTIVITY EXECUTION ATTACHMENTS
 export const insertActivityExecutionAttachmentSchema =
-  createInsertSchema(activityExecutionAttachments).omit({
-    id: true,
-    uploadedAt: true,
-  });
+  createInsertSchema(activityExecutionAttachments);

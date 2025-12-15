@@ -62,7 +62,7 @@ async function logAction(userId: string | undefined, action: string, entityType:
   }
 }
 
-async function logLgpdAccess(req: any, accessType: "view" | "export" | "search", dataCategory: string, entityType: string, entityId?: any, details?: any) {
+async function logLgpdAccess(req: any, accessType: "view" | "export" | "search", dataCategory: "personal_data" | "sensitive_data" | "financial_data", entityType: string, entityId?: any, details?: any) {
   try {
     const userId = req.user?.sub || null;
 
@@ -451,7 +451,7 @@ export async function registerRoutes(
           });
         }
 
-        const created = await storage.bulkCreateAllocations(allocations);
+        const created = await storage.bulkCreateAllocations(allocations as any);
 
         await logAction(req.user.id, "bulk_import", "allocation", undefined, {
           count: created.length,

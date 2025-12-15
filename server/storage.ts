@@ -60,6 +60,10 @@ import { eq, desc, and, like, gte, lte, or, sql } from "drizzle-orm";
 // Type for audit log with diff fields
 type AuditLogWithDiff = InsertAuditLog & {
   userId?: string | null;
+  action?: string;
+  entityType?: string;
+  entityId?: string | null;
+  details?: any;
   diffBefore?: any;
   diffAfter?: any;
 };
@@ -1321,7 +1325,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createActivityExecutionAttachment(attachment: InsertActivityExecutionAttachment): Promise<ActivityExecutionAttachment> {
-    const [created] = await db.insert(activityExecutionAttachments).values(attachment).returning();
+    const [created] = await db.insert(activityExecutionAttachments).values(attachment as any).returning();
     return created;
   }
 

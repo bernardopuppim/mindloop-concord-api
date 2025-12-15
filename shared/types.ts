@@ -115,6 +115,11 @@ export type LgpdLogWithRelations = LgpdLog & {
   user?: User | null;
 };
 
+export type DocumentChecklistWithRelations = DocumentChecklist & {
+  employee?: Employee | null;
+  post?: ServicePost | null;
+};
+
 export type FeriasLicencasWithRelations = FeriasLicencas & {
   employee?: Employee | null;
   createdByUser?: User | null;
