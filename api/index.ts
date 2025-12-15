@@ -1,15 +1,9 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createApp } from "../server/app";
 
-let app: any;
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 export default async function handler(
-  req: VercelRequest,
+  _req: VercelRequest,
   res: VercelResponse
 ) {
-  if (!app) {
-    app = await createApp();
-  }
-
-  return app(req, res);
+  return res.status(200).json({ ok: true, isolated: true });
 }
