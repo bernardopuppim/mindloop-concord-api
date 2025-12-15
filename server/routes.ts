@@ -14,9 +14,9 @@ import {
   insertFeriasLicencasSchema,
   insertServiceActivitySchema,
   insertActivityExecutionSchema,
-} from "../shared/schema";
+} from "../shared/schema.js";
 
-import { insertDocumentSchema } from "../shared/validation";
+import { insertDocumentSchema } from "../shared/validation.js";
 
 import multer from "multer";
 import path from "path";

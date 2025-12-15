@@ -13,7 +13,7 @@ import {
   activityExecutions,
   activityExecutionAttachments,
   alerts,
-} from "@shared/schema";
+} from "../shared/schema.js";
 import type {
   User,
   UpsertUser,
@@ -53,7 +53,7 @@ import type {
   ActivityExecutionWithRelations,
   ActivityExecutionAttachment,
   InsertActivityExecutionAttachment,
-} from "@shared/types";
+} from "../shared/types.js";
 import { db } from "./db.js";
 import { eq, desc, and, like, gte, lte, or, sql } from "drizzle-orm";
 
