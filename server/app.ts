@@ -31,7 +31,7 @@ export async function createApp() {
   app.get("/api/health", (_req, res) => res.status(200).json({ ok: true }));
 
   // Register all routes
-  await registerRoutes(httpServer, app);
+  //await registerRoutes(httpServer, app);
 
   return { app, httpServer };
 }
