@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { z } from "zod";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
@@ -34,13 +34,13 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-interface EmployeeFormProps {
-  employeeId?: number;
-}
-
-export default function EmployeeForm({ employeeId }: EmployeeFormProps) {
+export default function EmployeeForm() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  // ✅ ID vem da URL (wouter)
+  const params = useParams<{ id?: string }>();
+  const employeeId = params?.id ? Number(params.id) : undefined;
   const isEditing = !!employeeId;
 
   const { data: employee, isLoading } = useQuery<Employee>({
@@ -91,7 +91,9 @@ export default function EmployeeForm({ employeeId }: EmployeeFormProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       toast({
         title: translations.common.success,
-        description: isEditing ? translations.employees.employeeUpdated : translations.employees.employeeCreated,
+        description: isEditing
+          ? translations.employees.employeeUpdated
+          : translations.employees.employeeCreated,
       });
       setLocation("/employees");
     },

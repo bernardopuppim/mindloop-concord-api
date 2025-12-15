@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,13 +30,13 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-interface ServicePostFormProps {
-  postId?: number;
-}
-
-export default function ServicePostForm({ postId }: ServicePostFormProps) {
+export default function ServicePostForm() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  // ✅ postId vem da URL, não de props
+  const params = useParams<{ id?: string }>();
+  const postId = params?.id ? Number(params.id) : undefined;
   const isEditing = !!postId;
 
   const { data: servicePost, isLoading } = useQuery<ServicePost>({
@@ -87,7 +87,9 @@ export default function ServicePostForm({ postId }: ServicePostFormProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/service-posts"] });
       toast({
         title: translations.common.success,
-        description: isEditing ? translations.servicePosts.postUpdated : translations.servicePosts.postCreated,
+        description: isEditing
+          ? translations.servicePosts.postUpdated
+          : translations.servicePosts.postCreated,
       });
       setLocation("/service-posts");
     },
