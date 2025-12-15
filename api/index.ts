@@ -1,22 +1,29 @@
-// 🧪 ETAPA 1: Isolamento Total - Handler Express Mínimo
-// Objetivo: Validar que o runtime do Vercel executa Express corretamente
-// Temporário: Este código será evoluído em etapas controladas
+// 🧪 ETAPA 2: Express Base com Middlewares
+// Objetivo: Validar que middlewares Express não causam problemas no runtime
+// Temporário: será evoluído para ETAPA 3 após validação
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import express from "express";
 
 let app: any;
 
+async function createApp() {
+  const app = express();
+
+  app.set("trust proxy", 1);
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: false }));
+
+  app.get("/api", (_req, res) => {
+    res.json({ ok: true, step: "express-base" });
+  });
+
+  return app;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!app) {
-    const a = express();
-
-    a.get("/api", (_req, res) => {
-      res.json({ ok: true, isolated: true });
-    });
-
-    app = a;
+    app = await createApp();
   }
-
   return app(req, res);
 }
