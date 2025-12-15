@@ -19,26 +19,30 @@ import {
 import { insertDocumentSchema } from "../shared/validation.js";
 
 import multer from "multer";
-import path from "path";
-import fs from "fs";
-import { randomUUID } from "crypto";
+import { supabaseAdmin } from "./supabaseClient.js";
 
 /* ============================================================
-   Upload settings
+   Upload settings (in-memory, serverless-friendly)
    ============================================================ */
 
-const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) =>
-      cb(null, `${randomUUID()}${path.extname(file.originalname)}`),
-  }),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (_req, file, cb) => {
+    const allowedMimes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // docx
+      "text/csv",
+    ];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Tipo de arquivo não permitido"));
+    }
+  },
 });
 
 /* ============================================================
@@ -414,12 +418,11 @@ export async function registerRoutes(
 
         const parsedPostId = parseInt(postId);
         if (isNaN(parsedPostId)) {
-          fs.unlinkSync(req.file.path);
           return res.status(400).json({ message: "Invalid postId" });
         }
 
-        const content = fs.readFileSync(req.file.path, "utf-8");
-        fs.unlinkSync(req.file.path);
+        // Read from memory buffer instead of disk
+        const content = req.file.buffer.toString("utf-8");
 
         const lines = content.trim().split("\n");
         if (lines.length < 2) {
@@ -613,15 +616,40 @@ export async function registerRoutes(
 
         const parsed = insertDocumentSchema.safeParse(req.body);
         if (!parsed.success) {
-          fs.unlinkSync(req.file.path);
           return res.status(400).json(parsed.error);
         }
 
-        const filePath = req.file.path.replace(/\\/g, "/");
+        // Generate storage path following documented structure
+        const timestamp = new Date().toISOString().split("T")[0]; // yyyy-mm-dd
+        const contractId = parsed.data.postId || "general";
+        const employeeId = parsed.data.employeeId || "unassigned";
+        const safeName = req.file.originalname
+          .toLowerCase()
+          .replace(/[^a-z0-9.]/g, "-");
 
+        const storagePath = `contracts/${contractId}/employees/${employeeId}/${timestamp}_${safeName}`;
+
+        // Upload to Supabase Storage
+        const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+          .from("contract-documents")
+          .upload(storagePath, req.file.buffer, {
+            contentType: req.file.mimetype,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error("Supabase upload error:", uploadError);
+          return res.status(500).json({
+            message: "Failed to upload to storage",
+            error: uploadError.message
+          });
+        }
+
+        // Save metadata to database
         const doc = await storage.createDocument({
           ...parsed.data,
-          path: filePath,
+          path: storagePath,
+          filename: safeName,
           size: req.file.size,
           mimeType: req.file.mimetype,
           originalName: req.file.originalname,
@@ -647,14 +675,25 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Document not found" });
       }
 
-      if (!fs.existsSync(document.path)) {
-        return res.status(404).json({ message: "File not found" });
+      // Generate signed URL (expires in 10 minutes)
+      const { data: signedData, error: signedError } = await supabaseAdmin.storage
+        .from("contract-documents")
+        .createSignedUrl(document.path, 600); // 600 seconds = 10 minutes
+
+      if (signedError || !signedData) {
+        console.error("Signed URL error:", signedError);
+        return res.status(500).json({ message: "Failed to generate download URL" });
       }
 
       await logLgpdAccess(req, "export", "sensitive_data", "document", id);
 
-      res.download(document.path, document.originalName);
-    } catch {
+      res.json({
+        url: signedData.signedUrl,
+        originalName: document.originalName,
+        expiresIn: 600
+      });
+    } catch (err) {
+      console.error(err);
       res.status(500).json({ message: "Failed to download document" });
     }
   });
@@ -683,8 +722,14 @@ export async function registerRoutes(
       const before = await storage.getDocument(id);
       if (!before) return res.status(404).json({ message: "Not found" });
 
-      if (fs.existsSync(before.path)) {
-        fs.unlinkSync(before.path);
+      // Delete from Supabase Storage
+      const { error: deleteError } = await supabaseAdmin.storage
+        .from("contract-documents")
+        .remove([before.path]);
+
+      if (deleteError) {
+        console.error("Supabase delete error:", deleteError);
+        // Continue with database deletion even if storage delete fails
       }
 
       await storage.deleteDocument(id);
@@ -692,7 +737,8 @@ export async function registerRoutes(
       await logAction(req.user.id, "delete", "document", id, null, before, null);
 
       res.status(204).send();
-    } catch {
+    } catch (err) {
+      console.error(err);
       res.status(500).json({ message: "Failed to delete document" });
     }
   });
