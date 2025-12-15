@@ -13,7 +13,7 @@ import {
   serviceActivities,
   activityExecutions,
   activityExecutionAttachments,
-} from "./schema";
+} from "./schema.js";
 
 import {
   insertEmployeeSchema,
@@ -29,7 +29,7 @@ import {
   insertServiceActivitySchema,
   insertActivityExecutionSchema,
   insertActivityExecutionAttachmentSchema,
-} from "./validation";
+} from "./validation.js";
 
 import { z } from "zod";
 

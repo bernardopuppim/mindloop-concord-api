@@ -14,7 +14,7 @@ import {
   serviceActivities,
   activityExecutions,
   activityExecutionAttachments,
-} from "./schema";
+} from "./schema.js";
 
 import { createInsertSchema } from "drizzle-zod";
 
