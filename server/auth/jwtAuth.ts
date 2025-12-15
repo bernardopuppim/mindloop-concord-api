@@ -1,7 +1,11 @@
 import type { Request, Response, NextFunction } from "express";
-import { supabaseAdmin } from "../supabaseClient";
+import { supabaseAdmin } from "../supabaseClient.js";
 
-export async function authenticateJWT(req: Request, res: Response, next: NextFunction) {
+export async function authenticateJWT(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -21,9 +25,8 @@ export async function authenticateJWT(req: Request, res: Response, next: NextFun
       return res.status(401).json({ message: "Invalid or expired token" });
     }
 
-    // Anexa o usuário autenticado no request
     (req as any).user = data.user;
-    next();
+    return next();
   } catch (err) {
     console.error("Authentication error:", err);
     return res.status(401).json({ message: "Authentication failed" });

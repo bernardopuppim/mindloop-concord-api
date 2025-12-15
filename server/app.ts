@@ -12,7 +12,7 @@ export async function createApp() {
   app.use(express.urlencoded({ extended: false }));
 
   // Healthcheck obrigatório
-  app.get("/api/health", (_req, res) => {
+  app.get("/health", (_req, res) => {
     res.status(200).json({ ok: true });
   });
 
