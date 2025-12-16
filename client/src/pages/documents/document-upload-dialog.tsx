@@ -24,6 +24,7 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [documentType, setDocumentType] = useState<string>("other");
+  const [category, setCategory] = useState<string>("");
   const [linkType, setLinkType] = useState<string>("none");
   const [linkedId, setLinkedId] = useState<string>("");
   const [monthYear, setMonthYear] = useState<string>("");
@@ -39,6 +40,10 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
       formData.append("file", selectedFile);
       formData.append("documentType", documentType);
 
+      if (category) {
+        formData.append("category", category);
+      }
+
       if (linkType === "employee" && linkedId) {
         formData.append("employeeId", linkedId);
       } else if (linkType === "post" && linkedId) {
@@ -51,7 +56,7 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
         formData.append("expirationDate", expirationDate);
       }
 
-      const response = await fetch("/api/documents/upload", {
+      const response = await fetch("/api/documents", {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -94,6 +99,7 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
   const handleClose = () => {
     setSelectedFile(null);
     setDocumentType("other");
+    setCategory("");
     setLinkType("none");
     setLinkedId("");
     setMonthYear("");
@@ -176,6 +182,25 @@ export function DocumentUploadDialog({ open, onOpenChange, employees, servicePos
                 <SelectItem value="evidence">{translations.documents.evidence}</SelectItem>
                 <SelectItem value="contract">{translations.documents.contract}</SelectItem>
                 <SelectItem value="other">{translations.documents.other}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Categoria ({translations.common.optional})</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger data-testid="select-category">
+                <SelectValue placeholder={translations.common.selectOption} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Nenhuma</SelectItem>
+                <SelectItem value="atestados">Atestados</SelectItem>
+                <SelectItem value="comprovantes">Comprovantes</SelectItem>
+                <SelectItem value="relatorios_mensais">Relatórios Mensais</SelectItem>
+                <SelectItem value="evidencias_posto">Evidências de Posto</SelectItem>
+                <SelectItem value="treinamentos">Treinamentos</SelectItem>
+                <SelectItem value="certidoes">Certidões</SelectItem>
+                <SelectItem value="outros">Outros</SelectItem>
               </SelectContent>
             </Select>
           </div>

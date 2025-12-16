@@ -86,6 +86,38 @@ export default function DocumentsPage() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [versionHistoryDocId, setVersionHistoryDocId] = useState<number | null>(null);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  const handleDownload = async (id: number) => {
+    setDownloadingId(id);
+    try {
+      const response = await fetch(`/api/documents/${id}/download`, {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate download URL");
+      }
+
+      const data = await response.json();
+
+      // Open signed URL in new tab or trigger download
+      window.open(data.url, '_blank');
+
+      toast({
+        title: translations.common.success,
+        description: "Download iniciado"
+      });
+    } catch (error) {
+      toast({
+        title: translations.common.error,
+        description: "Falha ao baixar documento",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const { data: documentVersions, isLoading: isLoadingVersions } = useQuery<Document[]>({
     queryKey: ["/api/documents", versionHistoryDocId, "versions"],
@@ -240,15 +272,27 @@ export default function DocumentsPage() {
       className: "text-right",
       cell: (doc: Document) => (
         <div className="flex items-center justify-end gap-1">
-          <Button variant="ghost" size="icon" asChild data-testid={`button-view-doc-${doc.id}`}>
-            <a href={`/api/documents/${doc.id}/download`} target="_blank" rel="noopener noreferrer">
-              <Eye className="h-4 w-4" />
-            </a>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleDownload(doc.id)}
+            disabled={downloadingId === doc.id}
+            data-testid={`button-view-doc-${doc.id}`}
+          >
+            <Eye className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" asChild data-testid={`button-download-doc-${doc.id}`}>
-            <a href={`/api/documents/${doc.id}/download`} download>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleDownload(doc.id)}
+            disabled={downloadingId === doc.id}
+            data-testid={`button-download-doc-${doc.id}`}
+          >
+            {downloadingId === doc.id ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
               <Download className="h-4 w-4" />
-            </a>
+            )}
           </Button>
           {(doc as any).version > 1 && (
             <Button
@@ -495,10 +539,17 @@ export default function DocumentsPage() {
                       <div className="text-xs text-muted-foreground">{ver.createdAt ? formatDate(ver.createdAt) : "N/A"}</div>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" asChild>
-                    <a href={`/api/documents/${ver.id}/download`} download>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDownload(ver.id)}
+                    disabled={downloadingId === ver.id}
+                  >
+                    {downloadingId === ver.id ? (
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
                       <Download className="h-4 w-4" />
-                    </a>
+                    )}
                   </Button>
                 </div>
               ))
