@@ -646,21 +646,51 @@ export async function registerRoutes(
         }
 
         // Save metadata to database
-        const doc = await storage.createDocument({
-          ...parsed.data,
-          path: storagePath,
-          filename: safeName,
-          size: req.file.size,
-          mimeType: req.file.mimetype,
-          originalName: req.file.originalname,
-          uploadedBy: req.user.id,
-        });
+        let doc;
+        try {
+          doc = await storage.createDocument({
+            ...parsed.data,
+            path: storagePath,
+            filename: safeName,
+            size: req.file.size,
+            mimeType: req.file.mimetype,
+            originalName: req.file.originalname,
+            uploadedBy: req.user.id,
+          });
+        } catch (dbError: any) {
+          console.error("Database insert error:", dbError);
+
+          // Rollback: Remove file from storage if database insert fails
+          try {
+            await supabaseAdmin.storage
+              .from("contract-documents")
+              .remove([storagePath]);
+            console.log("Rollback successful: removed orphan file from storage");
+          } catch (rollbackError) {
+            console.error("Rollback failed:", rollbackError);
+            // Log but don't fail the request - orphan file will need manual cleanup
+          }
+
+          // Return appropriate error
+          if (dbError.code === "23505") {
+            // Unique constraint violation (duplicate path)
+            return res.status(409).json({
+              message: "Document with this path already exists",
+              code: "DUPLICATE_PATH"
+            });
+          }
+
+          return res.status(500).json({
+            message: "Failed to save document metadata",
+            error: dbError.message
+          });
+        }
 
         await logAction(req.user.id, "create", "document", doc.id);
 
         res.status(201).json(doc);
-      } catch (err) {
-        console.error(err);
+      } catch (err: any) {
+        console.error("Unexpected error:", err);
         res.status(500).json({ message: "Failed to upload document" });
       }
     }
